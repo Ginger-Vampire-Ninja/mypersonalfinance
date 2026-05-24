@@ -14,7 +14,7 @@
     .sidebar-logo { padding: 24px 22px 18px; font-size: 1.25rem; font-weight: 700; border-bottom: 1px solid #2d2d4e; }
     .sidebar-logo span { color: #6c63ff; }
     .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
-    .nav-section { padding: 10px 22px 4px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #444; font-weight: 700; }
+    .nav-section { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px 22px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #444; font-weight: 700; cursor: pointer; user-select: none; }
     .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 22px; cursor: pointer; font-size: 0.9rem; color: #999; transition: all 0.15s; border-left: 3px solid transparent; }
     .nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
     .nav-item.active { color: #fff; background: rgba(108,99,255,0.15); border-left-color: #6c63ff; }
@@ -25,10 +25,7 @@
     /* Indented child items under a sub-section */
     .nav-item.sub { padding-left: 34px; font-size: 0.85rem; }
     /* Collapsible nav groups */
-    .nav-section { cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding-right: 14px; user-select: none; }
-    .nav-chevron { font-size: 0.65rem; opacity: 0.45; transition: transform 0.2s; margin-left: auto; }
-    .nav-group-items { overflow: hidden; transition: max-height 0.25s ease; max-height: 500px; }
-    .nav-group.collapsed .nav-group-items { max-height: 0; }
+    .nav-chevron { font-size: 0.65rem; opacity: 0.45; transition: transform 0.2s; flex-shrink: 0; display: inline-block; }
     .nav-group.collapsed .nav-chevron { transform: rotate(-90deg); }
     .sidebar-footer { padding: 14px 22px; font-size: 0.72rem; color: #444; border-top: 1px solid #2d2d4e; }
 
@@ -1813,18 +1810,26 @@ function renderCCTransactions() {
 function toggleNavGroup(key) {
   const group = document.getElementById('navg-' + key);
   if (!group) return;
-  group.classList.toggle('collapsed');
+  const items = group.querySelector('.nav-group-items');
+  const isNowCollapsed = group.classList.toggle('collapsed');
+  if (items) items.style.display = isNowCollapsed ? 'none' : 'block';
   const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
-  states[key] = group.classList.contains('collapsed');
+  states[key] = isNowCollapsed;
   localStorage.setItem('mf_nav_state', JSON.stringify(states));
 }
 
 function restoreNavState() {
   const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
-  Object.keys(states).forEach(key => {
-    if (states[key]) {
-      const g = document.getElementById('navg-' + key);
-      if (g) g.classList.add('collapsed');
+  ['overview','transactions','debt','planning'].forEach(key => {
+    const g = document.getElementById('navg-' + key);
+    if (!g) return;
+    const items = g.querySelector('.nav-group-items');
+    if (states[key] === true) {
+      g.classList.add('collapsed');
+      if (items) items.style.display = 'none';
+    } else {
+      g.classList.remove('collapsed');
+      if (items) items.style.display = 'block';
     }
   });
 }
