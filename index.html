@@ -170,6 +170,11 @@
     #toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 0.88rem; font-weight: 500; opacity: 0; transform: translateY(10px); transition: all 0.25s; z-index: 9999; pointer-events: none; }
     #toast.show { opacity: 1; transform: translateY(0); }
     ::-webkit-scrollbar { width: 5px; height: 5px; } ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+    /* Card transaction inline edit */
+    .cct-edit-input { padding: 5px 8px; border: 1.5px solid #6c63ff; border-radius: 6px; font-size: 0.84rem; width: 100%; background: #fff; outline: none; box-sizing: border-box; }
+    .cct-edit-input:focus { border-color: #574fd6; }
+    .badge-card { background: #ede9fe; color: #7c3aed; }
   </style>
 </head>
 <body>
@@ -189,6 +194,7 @@
       <div class="nav-section">Debt</div>
       <div class="nav-subsection">Credit Cards</div>
       <div class="nav-item sub" onclick="navigate('credit')"><span class="icon">💳</span> Add Credit Card</div>
+      <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Transactions</div>
       <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Interest Free</div>
       <div class="nav-item sub" onclick="navigate('calculators')"><span class="icon">🧮</span> Calculators</div>
 
@@ -502,6 +508,48 @@
       </div>
     </section>
 
+    <!-- ══════════ CARD TRANSACTIONS ══════════ -->
+    <section class="page" id="page-cctransactions">
+      <div class="page-header"><h1>Card Transactions</h1><p>Record one-off purchases on your credit cards. Future-dated transactions are added to your card balance in the cashflow forecast, affecting interest and minimum payments.</p></div>
+
+      <div class="panel">
+        <div class="panel-title">Add Transaction</div>
+        <div id="cct-no-cards" style="display:none">
+          <div class="no-cards-notice">⚠️ You need to save at least one credit card before adding transactions. <a href="#" onclick="navigate('credit');return false;" style="color:#92400e;font-weight:700">Go to Credit Cards →</a></div>
+        </div>
+        <div id="cct-form-fields">
+          <div class="form-grid">
+            <div class="form-group"><label>Credit Card</label><select id="cct-card"><option value="">— select a card —</option></select></div>
+            <div class="form-group"><label>Date</label><input type="date" id="cct-date"/><span class="hint">Future dates appear in your cashflow forecast</span></div>
+            <div class="form-group"><label>Amount (£)</label><input type="number" id="cct-amount" placeholder="0.00" min="0.01" step="0.01"/></div>
+            <div class="form-group"><label>Category</label>
+              <select id="cct-category">
+                <option>Shopping</option><option>Food & Groceries</option><option>Transport</option>
+                <option>Entertainment</option><option>Utilities</option><option>Healthcare</option>
+                <option>Travel</option><option>Clothing</option><option>Electronics</option>
+                <option>Eating Out</option><option>Subscriptions</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Description</label><input type="text" id="cct-description" placeholder="e.g. Amazon purchase"/></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" onclick="addCCTransaction()">+ Add Transaction</button></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Transaction History <span id="cct-summary" style="font-size:0.82rem;font-weight:600;margin-left:8px;"></span></div>
+        <div class="tabs" id="cct-tabs">
+          <div class="tab active" onclick="setCCTFilter('all')">All</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Card</th><th>Category</th><th>Description</th><th>Amount</th><th>Forecast?</th><th></th></tr></thead>
+            <tbody id="cct-table-body"><tr><td colspan="7" class="empty-state">No transactions yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 <div id="toast"></div>
@@ -515,13 +563,15 @@ let expenseData      = JSON.parse(localStorage.getItem('mf_expenses')  || '[]');
 let recurringData    = JSON.parse(localStorage.getItem('mf_recurring') || '[]');
 let creditCards      = JSON.parse(localStorage.getItem('mf_cards')     || '[]');
 let interestFreeDeals= JSON.parse(localStorage.getItem('mf_deals')     || '[]');
+let ccTransactions   = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]');
 
 function saveData() {
   localStorage.setItem('mf_income',    JSON.stringify(incomeData));
   localStorage.setItem('mf_expenses',  JSON.stringify(expenseData));
   localStorage.setItem('mf_recurring', JSON.stringify(recurringData));
   localStorage.setItem('mf_cards',     JSON.stringify(creditCards));
-  localStorage.setItem('mf_deals',     JSON.stringify(interestFreeDeals));
+  localStorage.setItem('mf_deals',          JSON.stringify(interestFreeDeals));
+  localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
 }
 
 // ══════════════════════════════════════════════════
@@ -540,6 +590,7 @@ function navigate(page) {
     recurring: () => { renderRecurringTable(); renderUpcomingTimeline(); },
     cashflow: renderCashflow,
     credit: renderCardList,
+    cctransactions: renderCCTransactions,
     calculators: () => {}, // static page, no render needed
     deals: renderDealsPage
   };
@@ -571,7 +622,7 @@ function isThisMonthOrFuture(ds) {
 }
 function setDefaultDates() {
   const t = todayStr();
-  ['oneoff-date','rec-start','deal-start'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
+  ['oneoff-date','rec-start','deal-start','cct-date'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
 }
 
 const FREQ_MONTHLY = { weekly:52/12, fortnightly:26/12, monthly:1, quarterly:4/12, annually:1/12 };
@@ -678,6 +729,15 @@ function generateProjection(numMonths) {
       const d = new Date(r.date + 'T00:00:00');
       return d.getFullYear() === yr && d.getMonth() === mo;
     }).forEach(r => { oneOffExp += r.amount; oneOffExpItems.push({ name: r.description || r.category, amount: r.amount }); });
+
+    // Apply any CC transactions for this month (new charges increase the balance before interest)
+    ccTransactions.filter(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      return d.getFullYear() === yr && d.getMonth() === mo;
+    }).forEach(t => {
+      const card = cardStates.find(c => c.id === t.cardId);
+      if (card) card.balance += t.amount;
+    });
 
     // Credit card minimum payments (with interest-free deal awareness)
     let ccTotal = 0; const ccPayments = [];
@@ -1280,6 +1340,153 @@ function calcInterestComparison() {
     <thead><tr><th>Monthly Payment</th><th>Time</th><th>Total Interest</th><th>Total Cost</th></tr></thead>
     <tbody>${rows.map((r,i)=>`<tr style="${i===rows.length-1?'background:#f0fdf4':''}"><td style="font-weight:600">${fmt(r.p)}</td><td>${r.time}</td><td style="color:#dc2626">${fmt(r.interest)}</td><td style="font-weight:600">${fmt(b+r.interest)}</td></tr>`).join('')}</tbody>
   </table><p style="font-size:0.75rem;color:#aaa;margin-top:8px">Balance: ${fmt(b)} · Rate: ${r}% APR · Monthly interest: ${fmt(mi)}</p></div>`;
+}
+
+// ══════════════════════════════════════════════════
+//  CARD TRANSACTIONS
+// ══════════════════════════════════════════════════
+const CC_TXN_CATS = ['Shopping','Food & Groceries','Transport','Entertainment','Utilities','Healthcare','Travel','Clothing','Electronics','Eating Out','Subscriptions','Other'];
+
+let currentCCTFilter = 'all';
+let editingCCTId     = null;
+
+function setCCTFilter(f) {
+  currentCCTFilter = f;
+  renderCCTransactions();
+}
+
+function addCCTransaction() {
+  const cardId = parseInt(document.getElementById('cct-card').value);
+  const date   = document.getElementById('cct-date').value;
+  const amount = parseFloat(document.getElementById('cct-amount').value);
+  const cat    = document.getElementById('cct-category').value;
+  const desc   = document.getElementById('cct-description').value.trim();
+  if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
+  if (!date)                        { toast('⚠️ Pick a date'); return; }
+  if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
+  ccTransactions.push({ id: Date.now(), cardId, date, amount, category: cat, description: desc || cat });
+  saveData(); renderCCTransactions(); toast('✅ Transaction added!');
+  document.getElementById('cct-amount').value = '';
+  document.getElementById('cct-description').value = '';
+}
+
+function deleteCCTransaction(id) {
+  ccTransactions = ccTransactions.filter(t => t.id !== id);
+  saveData(); renderCCTransactions(); toast('🗑 Deleted');
+}
+
+function editCCTransaction(id) {
+  editingCCTId = id;
+  renderCCTransactions();
+}
+
+function cancelCCTEdit() {
+  editingCCTId = null;
+  renderCCTransactions();
+}
+
+function saveCCTEdit(id) {
+  const row = document.getElementById('cct-edit-row-' + id);
+  if (!row) return;
+  const date   = row.querySelector('[data-field="date"]').value;
+  const cardId = parseInt(row.querySelector('[data-field="card"]').value);
+  const cat    = row.querySelector('[data-field="cat"]').value;
+  const desc   = row.querySelector('[data-field="desc"]').value.trim();
+  const amount = parseFloat(row.querySelector('[data-field="amount"]').value);
+  if (!date)                        { toast('⚠️ Pick a date'); return; }
+  if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
+  if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
+  ccTransactions = ccTransactions.map(t => t.id === id ? { ...t, date, cardId, category: cat, description: desc || cat, amount } : t);
+  saveData(); editingCCTId = null; renderCCTransactions(); toast('✅ Updated!');
+}
+
+function renderCCTransactions() {
+  const tbody = document.getElementById('cct-table-body');
+  if (!tbody) return;
+  const today = todayStr();
+
+  // Show/hide form based on whether cards exist
+  const noCardsEl   = document.getElementById('cct-no-cards');
+  const formFieldsEl= document.getElementById('cct-form-fields');
+  if (noCardsEl && formFieldsEl) {
+    noCardsEl.style.display    = creditCards.length ? 'none' : '';
+    formFieldsEl.style.display = creditCards.length ? '' : 'none';
+  }
+
+  // Repopulate card selector
+  const cardSel = document.getElementById('cct-card');
+  if (cardSel && creditCards.length) {
+    const prev = cardSel.value;
+    cardSel.innerHTML = '<option value="">— select a card —</option>'
+      + creditCards.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    if (prev) cardSel.value = prev;
+  }
+
+  // Build filter tabs dynamically (All + one per card)
+  const tabsEl = document.getElementById('cct-tabs');
+  if (tabsEl) {
+    tabsEl.innerHTML =
+      `<div class="tab ${currentCCTFilter==='all'?'active':''}" onclick="setCCTFilter('all')">All</div>`
+      + creditCards.map(c =>
+          `<div class="tab ${currentCCTFilter===String(c.id)?'active':''}" onclick="setCCTFilter('${c.id}')">${c.name}</div>`
+        ).join('');
+  }
+
+  // Filter rows
+  const rows = (currentCCTFilter === 'all'
+    ? [...ccTransactions]
+    : ccTransactions.filter(t => String(t.cardId) === currentCCTFilter)
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Summary line
+  const total = ccTransactions.reduce((s, t) => s + t.amount, 0);
+  const summaryEl = document.getElementById('cct-summary');
+  if (summaryEl) summaryEl.innerHTML = ccTransactions.length
+    ? `<span style="color:#7c3aed">${ccTransactions.length} transaction${ccTransactions.length!==1?'s':''} · Total charged: ${fmt(total)}</span>`
+    : '';
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No transactions yet</td></tr>';
+    return;
+  }
+
+  const catOpts = (sel) => CC_TXN_CATS.map(c => `<option${c===sel?' selected':''}>${c}</option>`).join('');
+  const cardOpts = (sel) => creditCards.map(c => `<option value="${c.id}"${c.id===sel?' selected':''}>${c.name}</option>`).join('');
+
+  tbody.innerHTML = rows.map(t => {
+    const card     = creditCards.find(c => c.id === t.cardId);
+    const cardName = card ? card.name : '(card deleted)';
+    const future   = t.date > today;
+    const inFc     = isThisMonthOrFuture(t.date);
+
+    if (editingCCTId === t.id) {
+      return `<tr id="cct-edit-row-${t.id}" style="background:#faf5ff">
+        <td><input class="cct-edit-input" data-field="date"   type="date"   value="${t.date}"         style="width:130px"/></td>
+        <td><select class="cct-edit-input" data-field="card"  style="width:140px">${cardOpts(t.cardId)}</select></td>
+        <td><select class="cct-edit-input" data-field="cat"   style="width:130px">${catOpts(t.category)}</select></td>
+        <td><input class="cct-edit-input"  data-field="desc"  type="text"   value="${t.description}"  placeholder="Description"/></td>
+        <td><input class="cct-edit-input"  data-field="amount" type="number" value="${t.amount}" min="0.01" step="0.01" style="width:90px"/></td>
+        <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-sm-ghost" onclick="saveCCTEdit(${t.id})">Save</button>
+          <button class="btn-sm-ghost" onclick="cancelCCTEdit()" style="margin-left:4px">Cancel</button>
+        </td>
+      </tr>`;
+    }
+
+    return `<tr>
+      <td>${formatDate(t.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
+      <td><span class="badge badge-card">💳 ${cardName}</span></td>
+      <td>${t.category}</td>
+      <td style="color:#666">${t.description}</td>
+      <td style="font-weight:600;color:#7c3aed">-${fmt(t.amount)}</td>
+      <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm-ghost" onclick="editCCTransaction(${t.id})" style="margin-right:4px">Edit</button>
+        <button class="btn-sm-danger" onclick="deleteCCTransaction(${t.id})">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════════
