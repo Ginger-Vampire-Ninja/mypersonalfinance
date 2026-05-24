@@ -510,7 +510,7 @@
 
     <!-- ══════════ CARD TRANSACTIONS ══════════ -->
     <section class="page" id="page-cctransactions">
-      <div class="page-header"><h1>Card Transactions</h1><p>Record one-off purchases on your credit cards. Future-dated transactions are added to your card balance in the cashflow forecast, affecting interest and minimum payments.</p></div>
+      <div class="page-header"><h1>CC Transactions</h1><p>Record credit card charges and payments. Charges increase your card balance; payments reduce it. Both affect your cashflow forecast including interest and minimum payment calculations.</p></div>
 
       <div class="panel">
         <div class="panel-title">Add Transaction</div>
@@ -518,11 +518,15 @@
           <div class="no-cards-notice">⚠️ You need to save at least one credit card before adding transactions. <a href="#" onclick="navigate('credit');return false;" style="color:#92400e;font-weight:700">Go to Credit Cards →</a></div>
         </div>
         <div id="cct-form-fields">
+          <div class="type-toggle">
+            <button class="toggle-btn expense active" id="cct-toggle-charge"  onclick="setCCTType('charge')">💳 Charge</button>
+            <button class="toggle-btn income"          id="cct-toggle-payment" onclick="setCCTType('payment')">💸 Payment</button>
+          </div>
           <div class="form-grid">
             <div class="form-group"><label>Credit Card</label><select id="cct-card"><option value="">— select a card —</option></select></div>
             <div class="form-group"><label>Date</label><input type="date" id="cct-date"/><span class="hint">Future dates appear in your cashflow forecast</span></div>
             <div class="form-group"><label>Amount (£)</label><input type="number" id="cct-amount" placeholder="0.00" min="0.01" step="0.01"/></div>
-            <div class="form-group"><label>Category</label>
+            <div class="form-group" id="cct-category-group"><label>Category</label>
               <select id="cct-category">
                 <option>Shopping</option><option>Food & Groceries</option><option>Transport</option>
                 <option>Entertainment</option><option>Utilities</option><option>Healthcare</option>
@@ -532,7 +536,7 @@
             </div>
             <div class="form-group"><label>Description</label><input type="text" id="cct-description" placeholder="e.g. Amazon purchase"/></div>
           </div>
-          <div class="form-actions"><button class="btn btn-primary" onclick="addCCTransaction()">+ Add Transaction</button></div>
+          <div class="form-actions"><button class="btn btn-primary" onclick="addCCTransaction()" id="cct-add-btn">+ Add Charge</button></div>
         </div>
       </div>
 
@@ -543,8 +547,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Card</th><th>Category</th><th>Description</th><th>Amount</th><th>Forecast?</th><th></th></tr></thead>
-            <tbody id="cct-table-body"><tr><td colspan="7" class="empty-state">No transactions yet</td></tr></tbody>
+            <thead><tr><th>Date</th><th>Type</th><th>Card</th><th>Category</th><th>Description</th><th>Amount</th><th>Forecast?</th><th></th></tr></thead>
+            <tbody id="cct-table-body"><tr><td colspan="8" class="empty-state">No transactions yet</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -563,14 +567,24 @@ let expenseData      = JSON.parse(localStorage.getItem('mf_expenses')  || '[]');
 let recurringData    = JSON.parse(localStorage.getItem('mf_recurring') || '[]');
 let creditCards      = JSON.parse(localStorage.getItem('mf_cards')     || '[]');
 let interestFreeDeals= JSON.parse(localStorage.getItem('mf_deals')     || '[]');
-let ccTransactions   = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]');
+// Load CC transactions, defaulting legacy entries (no type field) to 'charge'
+let ccTransactions = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]')
+  .map(t => ({ ...t, type: t.type || 'charge' }));
+// One-time migration: absorb any entries saved under the old separate CC payments key
+(function migrateCCPayments() {
+  const old = JSON.parse(localStorage.getItem('mf_cc_payments') || '[]');
+  if (!old.length) return;
+  old.forEach(p => { if (!ccTransactions.find(t => t.id === p.id)) ccTransactions.push({ ...p, type: 'payment', category: 'CC Payment' }); });
+  localStorage.removeItem('mf_cc_payments');
+  localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
+})();
 
 function saveData() {
   localStorage.setItem('mf_income',    JSON.stringify(incomeData));
   localStorage.setItem('mf_expenses',  JSON.stringify(expenseData));
   localStorage.setItem('mf_recurring', JSON.stringify(recurringData));
   localStorage.setItem('mf_cards',     JSON.stringify(creditCards));
-  localStorage.setItem('mf_deals',          JSON.stringify(interestFreeDeals));
+  localStorage.setItem('mf_deals',           JSON.stringify(interestFreeDeals));
   localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
 }
 
@@ -730,13 +744,27 @@ function generateProjection(numMonths) {
       return d.getFullYear() === yr && d.getMonth() === mo;
     }).forEach(r => { oneOffExp += r.amount; oneOffExpItems.push({ name: r.description || r.category, amount: r.amount }); });
 
-    // Apply any CC transactions for this month (new charges increase the balance before interest)
+    // Apply CC charges for this month (new purchases increase the balance before interest)
     ccTransactions.filter(t => {
+      if (t.type === 'payment') return false;
       const d = new Date(t.date + 'T00:00:00');
       return d.getFullYear() === yr && d.getMonth() === mo;
     }).forEach(t => {
       const card = cardStates.find(c => c.id === t.cardId);
       if (card) card.balance += t.amount;
+    });
+
+    // Apply CC payments for this month (reduce balance before interest; cash outflow added to one-off expenses)
+    ccTransactions.filter(t => {
+      if (t.type !== 'payment') return false;
+      const d = new Date(t.date + 'T00:00:00');
+      return d.getFullYear() === yr && d.getMonth() === mo;
+    }).forEach(t => {
+      const card = cardStates.find(c => c.id === t.cardId);
+      if (card) card.balance = Math.max(0, card.balance - t.amount);
+      oneOffExp += t.amount;
+      const cardName = card ? card.name : 'CC';
+      oneOffExpItems.push({ name: (t.description || 'Payment') + ' → ' + cardName, amount: t.amount });
     });
 
     // Credit card minimum payments (with interest-free deal awareness)
@@ -874,10 +902,23 @@ function renderOneoffList() {
   let rows = [];
   if (currentOneoffFilter !== 'expense') incomeData.forEach(r  => rows.push({...r, type:'income'}));
   if (currentOneoffFilter !== 'income')  expenseData.forEach(r => rows.push({...r, type:'expense'}));
+  // Merge in CC payments as read-only expense rows
+  if (currentOneoffFilter !== 'income') {
+    ccTransactions.filter(t => t.type === 'payment').forEach(t => {
+      const card = creditCards.find(c => c.id === t.cardId);
+      const cardName = card ? card.name : 'Unknown Card';
+      rows.push({
+        id: t.id, date: t.date, type: 'expense',
+        category: 'CC Payment',
+        description: t.description ? `${t.description} (${cardName})` : `Payment to ${cardName}`,
+        amount: t.amount, _ccPayment: true
+      });
+    });
+  }
   rows.sort((a,b) => new Date(b.date)-new Date(a.date));
 
   const totalInc = incomeData.reduce((s,r)=>s+r.amount,0);
-  const totalExp = expenseData.reduce((s,r)=>s+r.amount,0);
+  const totalExp = expenseData.reduce((s,r)=>s+r.amount,0) + ccTransactions.filter(t=>t.type==='payment').reduce((s,t)=>s+t.amount,0);
   const net = totalInc - totalExp;
   const summaryEl = document.getElementById('oneoff-summary');
   if (summaryEl) summaryEl.innerHTML =
@@ -888,7 +929,13 @@ function renderOneoffList() {
   if (!rows.length) { tbody.innerHTML='<tr><td colspan="7" class="empty-state">No entries yet</td></tr>'; return; }
   tbody.innerHTML = rows.map(r => {
     const future=r.date>today, inFc=isThisMonthOrFuture(r.date);
-    const delFn = r.type==='income' ? `deleteIncome(${r.id})` : `deleteExpense(${r.id})`;
+    let actionCell;
+    if (r._ccPayment) {
+      actionCell = `<td><span class="badge" style="background:#dbeafe;color:#1d4ed8;font-size:0.7rem;cursor:pointer" onclick="navigate('cctransactions')" title="Manage on CC Transactions page">💸 CC Payment</span></td>`;
+    } else {
+      const delFn = r.type==='income' ? `deleteIncome(${r.id})` : `deleteExpense(${r.id})`;
+      actionCell = `<td><button class="btn-sm-danger" onclick="${delFn}">Delete</button></td>`;
+    }
     return `<tr>
       <td>${formatDate(r.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
       <td><span class="badge badge-${r.type}">${r.type}</span></td>
@@ -896,7 +943,7 @@ function renderOneoffList() {
       <td style="color:#666">${r.description}</td>
       <td style="font-weight:600;color:${r.type==='income'?'#16a34a':'#dc2626'}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</td>
       <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
-      <td><button class="btn-sm-danger" onclick="${delFn}">Delete</button></td></tr>`;
+      ${actionCell}</tr>`;
   }).join('');
 }
 
@@ -1343,56 +1390,65 @@ function calcInterestComparison() {
 }
 
 // ══════════════════════════════════════════════════
-//  CARD TRANSACTIONS
+//  CARD TRANSACTIONS (charges + payments)
 // ══════════════════════════════════════════════════
 const CC_TXN_CATS = ['Shopping','Food & Groceries','Transport','Entertainment','Utilities','Healthcare','Travel','Clothing','Electronics','Eating Out','Subscriptions','Other'];
 
-let currentCCTFilter = 'all';
-let editingCCTId     = null;
+let currentCCTFilter    = 'all';
+let currentCCTTypeInput = 'charge';
+let editingCCTId        = null;
 
 function setCCTFilter(f) {
   currentCCTFilter = f;
   renderCCTransactions();
 }
 
+function setCCTType(type) {
+  currentCCTTypeInput = type;
+  document.getElementById('cct-toggle-charge').classList.toggle('active',  type === 'charge');
+  document.getElementById('cct-toggle-payment').classList.toggle('active', type === 'payment');
+  const catGrp = document.getElementById('cct-category-group');
+  if (catGrp) catGrp.style.display = type === 'charge' ? '' : 'none';
+  const addBtn = document.getElementById('cct-add-btn');
+  if (addBtn) addBtn.textContent = type === 'charge' ? '+ Add Charge' : '+ Record Payment';
+  const descInput = document.getElementById('cct-description');
+  if (descInput) descInput.placeholder = type === 'charge' ? 'e.g. Amazon purchase' : 'e.g. Lump sum payment';
+}
+
 function addCCTransaction() {
   const cardId = parseInt(document.getElementById('cct-card').value);
   const date   = document.getElementById('cct-date').value;
   const amount = parseFloat(document.getElementById('cct-amount').value);
-  const cat    = document.getElementById('cct-category').value;
+  const type   = currentCCTTypeInput;
+  const cat    = type === 'charge' ? document.getElementById('cct-category').value : 'CC Payment';
   const desc   = document.getElementById('cct-description').value.trim();
   if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
   if (!date)                        { toast('⚠️ Pick a date'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
-  ccTransactions.push({ id: Date.now(), cardId, date, amount, category: cat, description: desc || cat });
-  saveData(); renderCCTransactions(); toast('✅ Transaction added!');
+  ccTransactions.push({ id: Date.now(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type });
+  saveData(); renderCCTransactions(); toast(type === 'charge' ? '✅ Charge added!' : '✅ Payment recorded!');
   document.getElementById('cct-amount').value = '';
   document.getElementById('cct-description').value = '';
 }
 
 function deleteCCTransaction(id) {
   ccTransactions = ccTransactions.filter(t => t.id !== id);
-  saveData(); renderCCTransactions(); toast('🗑 Deleted');
+  saveData(); renderCCTransactions(); renderOneoffList(); toast('🗑 Deleted');
 }
 
-function editCCTransaction(id) {
-  editingCCTId = id;
-  renderCCTransactions();
-}
-
-function cancelCCTEdit() {
-  editingCCTId = null;
-  renderCCTransactions();
-}
+function editCCTransaction(id) { editingCCTId = id; renderCCTransactions(); }
+function cancelCCTEdit()       { editingCCTId = null; renderCCTransactions(); }
 
 function saveCCTEdit(id) {
-  const row = document.getElementById('cct-edit-row-' + id);
+  const row    = document.getElementById('cct-edit-row-' + id);
   if (!row) return;
+  const txn    = ccTransactions.find(t => t.id === id);
   const date   = row.querySelector('[data-field="date"]').value;
   const cardId = parseInt(row.querySelector('[data-field="card"]').value);
-  const cat    = row.querySelector('[data-field="cat"]').value;
   const desc   = row.querySelector('[data-field="desc"]').value.trim();
   const amount = parseFloat(row.querySelector('[data-field="amount"]').value);
+  const catEl  = row.querySelector('[data-field="cat"]');
+  const cat    = catEl ? catEl.value : (txn ? txn.category : 'CC Payment');
   if (!date)                        { toast('⚠️ Pick a date'); return; }
   if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
@@ -1406,8 +1462,8 @@ function renderCCTransactions() {
   const today = todayStr();
 
   // Show/hide form based on whether cards exist
-  const noCardsEl   = document.getElementById('cct-no-cards');
-  const formFieldsEl= document.getElementById('cct-form-fields');
+  const noCardsEl    = document.getElementById('cct-no-cards');
+  const formFieldsEl = document.getElementById('cct-form-fields');
   if (noCardsEl && formFieldsEl) {
     noCardsEl.style.display    = creditCards.length ? 'none' : '';
     formFieldsEl.style.display = creditCards.length ? '' : 'none';
@@ -1432,40 +1488,48 @@ function renderCCTransactions() {
         ).join('');
   }
 
-  // Filter rows
+  // Filter rows by selected card
   const rows = (currentCCTFilter === 'all'
     ? [...ccTransactions]
     : ccTransactions.filter(t => String(t.cardId) === currentCCTFilter)
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Summary line
-  const total = ccTransactions.reduce((s, t) => s + t.amount, 0);
+  // Summary — separate totals for charges and payments
+  const charges  = ccTransactions.filter(t => t.type !== 'payment');
+  const payments = ccTransactions.filter(t => t.type === 'payment');
+  const totalCharged = charges.reduce((s, t) => s + t.amount, 0);
+  const totalPaid    = payments.reduce((s, t) => s + t.amount, 0);
   const summaryEl = document.getElementById('cct-summary');
-  if (summaryEl) summaryEl.innerHTML = ccTransactions.length
-    ? `<span style="color:#7c3aed">${ccTransactions.length} transaction${ccTransactions.length!==1?'s':''} · Total charged: ${fmt(total)}</span>`
-    : '';
+  if (summaryEl) {
+    const parts = [];
+    if (charges.length)  parts.push(`<span style="color:#7c3aed">${charges.length} charge${charges.length!==1?'s':''}: ${fmt(totalCharged)}</span>`);
+    if (payments.length) parts.push(`<span style="color:#16a34a">${payments.length} payment${payments.length!==1?'s':''}: ${fmt(totalPaid)}</span>`);
+    summaryEl.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+  }
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No transactions yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No transactions yet</td></tr>';
     return;
   }
 
-  const catOpts = (sel) => CC_TXN_CATS.map(c => `<option${c===sel?' selected':''}>${c}</option>`).join('');
+  const catOpts  = (sel) => CC_TXN_CATS.map(c => `<option${c===sel?' selected':''}>${c}</option>`).join('');
   const cardOpts = (sel) => creditCards.map(c => `<option value="${c.id}"${c.id===sel?' selected':''}>${c.name}</option>`).join('');
 
   tbody.innerHTML = rows.map(t => {
-    const card     = creditCards.find(c => c.id === t.cardId);
-    const cardName = card ? card.name : '(card deleted)';
-    const future   = t.date > today;
-    const inFc     = isThisMonthOrFuture(t.date);
+    const card      = creditCards.find(c => c.id === t.cardId);
+    const cardName  = card ? card.name : '(card deleted)';
+    const isPayment = t.type === 'payment';
+    const future    = t.date > today;
+    const inFc      = isThisMonthOrFuture(t.date);
 
     if (editingCCTId === t.id) {
-      return `<tr id="cct-edit-row-${t.id}" style="background:#faf5ff">
-        <td><input class="cct-edit-input" data-field="date"   type="date"   value="${t.date}"         style="width:130px"/></td>
-        <td><select class="cct-edit-input" data-field="card"  style="width:140px">${cardOpts(t.cardId)}</select></td>
-        <td><select class="cct-edit-input" data-field="cat"   style="width:130px">${catOpts(t.category)}</select></td>
-        <td><input class="cct-edit-input"  data-field="desc"  type="text"   value="${t.description}"  placeholder="Description"/></td>
-        <td><input class="cct-edit-input"  data-field="amount" type="number" value="${t.amount}" min="0.01" step="0.01" style="width:90px"/></td>
+      return `<tr id="cct-edit-row-${t.id}" style="background:${isPayment?'#f0fdf4':'#faf5ff'}">
+        <td><input class="cct-edit-input" data-field="date" type="date" value="${t.date}" style="width:130px"/></td>
+        <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
+        <td><select class="cct-edit-input" data-field="card" style="width:140px">${cardOpts(t.cardId)}</select></td>
+        <td>${isPayment ? '<span style="color:#aaa;font-size:0.82rem">—</span>' : `<select class="cct-edit-input" data-field="cat" style="width:130px">${catOpts(t.category)}</select>`}</td>
+        <td><input class="cct-edit-input" data-field="desc" type="text" value="${t.description}" placeholder="Description"/></td>
+        <td><input class="cct-edit-input" data-field="amount" type="number" value="${t.amount}" min="0.01" step="0.01" style="width:90px"/></td>
         <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn-sm-ghost" onclick="saveCCTEdit(${t.id})">Save</button>
@@ -1476,10 +1540,11 @@ function renderCCTransactions() {
 
     return `<tr>
       <td>${formatDate(t.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
+      <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
       <td><span class="badge badge-card">💳 ${cardName}</span></td>
-      <td>${t.category}</td>
+      <td style="color:#666">${isPayment ? '<span style="color:#aaa">—</span>' : t.category}</td>
       <td style="color:#666">${t.description}</td>
-      <td style="font-weight:600;color:#7c3aed">-${fmt(t.amount)}</td>
+      <td style="font-weight:600;color:${isPayment?'#16a34a':'#7c3aed'}">${isPayment?'-':'-'}${fmt(t.amount)}</td>
       <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn-sm-ghost" onclick="editCCTransaction(${t.id})" style="margin-right:4px">Edit</button>
