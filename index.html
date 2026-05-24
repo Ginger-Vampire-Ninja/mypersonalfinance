@@ -24,6 +24,12 @@
     .nav-subsection::before { content: ''; display: inline-block; width: 12px; height: 1px; background: #3d3d5e; }
     /* Indented child items under a sub-section */
     .nav-item.sub { padding-left: 34px; font-size: 0.85rem; }
+    /* Collapsible nav groups */
+    .nav-section { cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding-right: 14px; user-select: none; }
+    .nav-chevron { font-size: 0.65rem; opacity: 0.45; transition: transform 0.2s; margin-left: auto; }
+    .nav-group-items { overflow: hidden; transition: max-height 0.25s ease; max-height: 500px; }
+    .nav-group.collapsed .nav-group-items { max-height: 0; }
+    .nav-group.collapsed .nav-chevron { transform: rotate(-90deg); }
     .sidebar-footer { padding: 14px 22px; font-size: 0.72rem; color: #444; border-top: 1px solid #2d2d4e; }
 
     /* Main */
@@ -184,22 +190,42 @@
   <aside class="sidebar">
     <div class="sidebar-logo">My<span>Finance</span></div>
     <nav class="sidebar-nav">
-      <div class="nav-section">Overview</div>
-      <div class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</div>
 
-      <div class="nav-section">Transactions</div>
-      <div class="nav-item" onclick="navigate('recurring')"><span class="icon">🔁</span> Recurring</div>
-      <div class="nav-item" onclick="navigate('oneoff')"><span class="icon">📋</span> One-off</div>
+      <div class="nav-group" id="navg-overview">
+        <div class="nav-section" onclick="toggleNavGroup('overview')">Overview <span class="nav-chevron">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</div>
+        </div>
+      </div>
 
-      <div class="nav-section">Debt</div>
-      <div class="nav-subsection">Credit Cards</div>
-      <div class="nav-item sub" onclick="navigate('credit')"><span class="icon">💳</span> Manage Credit Cards</div>
-      <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Manage CC Transactions</div>
-      <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Manage Interest Free Periods</div>
-      <div class="nav-item sub" onclick="navigate('calculators')"><span class="icon">🧮</span> Calculators</div>
+      <div class="nav-group" id="navg-transactions">
+        <div class="nav-section" onclick="toggleNavGroup('transactions')">Transactions <span class="nav-chevron">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" onclick="navigate('recurring')"><span class="icon">🔁</span> Recurring</div>
+          <div class="nav-item" onclick="navigate('oneoff')"><span class="icon">📋</span> One-off</div>
+        </div>
+      </div>
 
-      <div class="nav-section">Planning</div>
-      <div class="nav-item" onclick="navigate('cashflow')"><span class="icon">📈</span> Cashflow</div>
+      <div class="nav-group" id="navg-debt">
+        <div class="nav-section" onclick="toggleNavGroup('debt')">Debt <span class="nav-chevron">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-subsection">Credit Cards</div>
+          <div class="nav-item sub" onclick="navigate('credit')"><span class="icon">💳</span> Manage Credit Cards</div>
+          <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Manage CC Transactions</div>
+          <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Manage Interest Free Periods</div>
+          <div class="nav-item sub" onclick="navigate('calculators')"><span class="icon">🧮</span> Calculators</div>
+          <div class="nav-subsection">Loans</div>
+          <div class="nav-item sub" onclick="navigate('loans')"><span class="icon">🏦</span> Manage Loans</div>
+        </div>
+      </div>
+
+      <div class="nav-group" id="navg-planning">
+        <div class="nav-section" onclick="toggleNavGroup('planning')">Planning <span class="nav-chevron">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" onclick="navigate('cashflow')"><span class="icon">📈</span> Cashflow</div>
+        </div>
+      </div>
+
     </nav>
     <div class="sidebar-footer">Data saved locally in your browser</div>
   </aside>
@@ -554,6 +580,82 @@
       </div>
     </section>
 
+    <!-- ══════════ LOANS ══════════ -->
+    <section class="page" id="page-loans">
+      <div class="page-header"><h1>Loans</h1><p>Track your loans and repayment schedules. Repayments appear as recurring expenses in your cashflow forecast.</p></div>
+
+      <!-- Summary cards -->
+      <div class="cards">
+        <div class="card"><div class="card-label">Active Loans</div><div class="card-value purple" id="loans-active-count">0</div><div class="card-sub">Currently repaying</div></div>
+        <div class="card"><div class="card-label">Total Borrowed</div><div class="card-value" id="loans-total-amount">£0.00</div><div class="card-sub">Combined loan amounts</div></div>
+        <div class="card"><div class="card-label">Monthly Repayments</div><div class="card-value red" id="loans-monthly-total">£0.00</div><div class="card-sub">Estimated monthly outgoing</div></div>
+        <div class="card"><div class="card-label">Completed Loans</div><div class="card-value green" id="loans-completed-count">0</div><div class="card-sub">Fully repaid</div></div>
+      </div>
+
+      <!-- Add / edit loan form -->
+      <div class="panel" id="loans-form-panel">
+        <div class="panel-title" id="loan-form-title">Add a Loan</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Lender</label>
+            <input type="text" id="loan-lender" placeholder="e.g. Barclays, Student Loans Co."/>
+          </div>
+          <div class="form-group">
+            <label>Total Loan Amount (£)</label>
+            <input type="number" id="loan-total" placeholder="e.g. 10000" min="0.01" step="0.01"/>
+          </div>
+          <div class="form-group">
+            <label>Repayment Amount (£)</label>
+            <input type="number" id="loan-repayment" placeholder="e.g. 250" min="0.01" step="0.01"/>
+          </div>
+          <div class="form-group">
+            <label>Repayment Frequency</label>
+            <select id="loan-frequency">
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="fortnightly">Fortnightly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annually">Annually</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Interest Rate / APR (%) <span style="font-weight:400;color:#888;font-size:0.8rem">optional</span></label>
+            <input type="number" id="loan-apr" placeholder="e.g. 5.9" min="0" step="0.01"/>
+            <span class="hint">Used for reference only — does not affect cashflow calculations</span>
+          </div>
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" id="loan-start"/>
+          </div>
+          <div class="form-group">
+            <label>End Date <span style="font-weight:400;color:#888;font-size:0.8rem">optional</span></label>
+            <input type="date" id="loan-end"/>
+            <span class="hint">Leave blank if the loan has no fixed end date</span>
+          </div>
+          <div class="form-group">
+            <label>Note <span style="font-weight:400;color:#888;font-size:0.8rem">optional</span></label>
+            <input type="text" id="loan-note" placeholder="e.g. Car loan — Ford Focus"/>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveLoan()">Save Loan</button>
+          <button class="btn-sm-ghost" onclick="cancelLoanEdit()" id="loan-cancel-btn" style="display:none">Cancel</button>
+          <input type="hidden" id="loan-edit-id" value=""/>
+        </div>
+      </div>
+
+      <!-- Loans list -->
+      <div class="panel">
+        <div class="panel-title">Your Loans</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Lender</th><th>Total Amount</th><th>Repayment</th><th>Frequency</th><th>APR</th><th>Start Date</th><th>End Date</th><th>Note</th><th></th></tr></thead>
+            <tbody id="loans-table-body"><tr><td colspan="9" class="empty-state">No loans saved yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 <div id="toast"></div>
@@ -570,6 +672,8 @@ let interestFreeDeals= JSON.parse(localStorage.getItem('mf_deals')     || '[]');
 // Load CC transactions, defaulting legacy entries (no type field) to 'charge'
 let ccTransactions = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]')
   .map(t => ({ ...t, type: t.type || 'charge' }));
+let loansData = JSON.parse(localStorage.getItem('mf_loans') || '[]');
+
 // One-time migration: absorb any entries saved under the old separate CC payments key
 (function migrateCCPayments() {
   const old = JSON.parse(localStorage.getItem('mf_cc_payments') || '[]');
@@ -586,6 +690,7 @@ function saveData() {
   localStorage.setItem('mf_cards',     JSON.stringify(creditCards));
   localStorage.setItem('mf_deals',           JSON.stringify(interestFreeDeals));
   localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
+  localStorage.setItem('mf_loans',           JSON.stringify(loansData));
 }
 
 // ══════════════════════════════════════════════════
@@ -606,7 +711,8 @@ function navigate(page) {
     credit: renderCardList,
     cctransactions: renderCCTransactions,
     calculators: () => {}, // static page, no render needed
-    deals: renderDealsPage
+    deals: renderDealsPage,
+    loans: renderLoansPage
   };
   if (renders[page]) renders[page]();
 }
@@ -636,7 +742,7 @@ function isThisMonthOrFuture(ds) {
 }
 function setDefaultDates() {
   const t = todayStr();
-  ['oneoff-date','rec-start','deal-start','cct-date'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
+  ['oneoff-date','rec-start','deal-start','cct-date','loan-start'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
 }
 
 const FREQ_MONTHLY = { weekly:52/12, fortnightly:26/12, monthly:1, quarterly:4/12, annually:1/12 };
@@ -728,6 +834,12 @@ function generateProjection(numMonths) {
     recurringData.filter(r => r.type === 'expense').forEach(r => {
       const amt = getAmountForMonth(r, yr, mo);
       if (amt > 0) { recExp += amt; expItems.push({ name: r.name, amount: amt }); }
+    });
+    // Loan repayments treated as recurring expenses
+    loansData.forEach(loan => {
+      const loanItem = { frequency: loan.frequency, startDate: loan.startDate, endDate: loan.endDate || null };
+      const amt = getAmountForMonth(loanItem, yr, mo);
+      if (amt > 0) { recExp += amt; expItems.push({ name: loan.lender + ' (loan)', amount: amt }); }
     });
 
     // One-off income for this calendar month
@@ -970,7 +1082,17 @@ function addRecurring() {
 function deleteRecurring(id) { recurringData=recurringData.filter(r=>r.id!==id); saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted'); }
 function renderRecurringTable() {
   const tbody=document.getElementById('recurring-table-body');
-  if (!recurringData.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-state">No recurring transactions yet</td></tr>'; return; }
+  // Build loan read-only rows
+  const loanRows = loansData.map(loan => `<tr style="opacity:0.8">
+    <td><span class="badge badge-expense" style="background:#1e3a5f;color:#93c5fd">🏦 Loan</span></td>
+    <td style="font-weight:600">${loan.lender}</td><td style="color:#888;font-size:0.82rem">Loan Repayment</td>
+    <td style="font-weight:600">${fmt(loan.repaymentAmount)}</td>
+    <td><span class="badge badge-freq">${FREQ_LABELS[loan.frequency]||loan.frequency}</span></td>
+    <td style="color:#666">${fmt(monthlyEquiv({ amount: loan.repaymentAmount, frequency: loan.frequency }))}/mo</td>
+    <td style="color:#888;font-size:0.82rem">${formatDate(loan.startDate)}</td>
+    <td style="color:#888;font-size:0.82rem">${loan.endDate?formatDate(loan.endDate):'—'}</td>
+    <td style="color:#aaa;font-size:0.78rem;font-style:italic">Managed in Loans</td></tr>`);
+  if (!recurringData.length && !loanRows.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-state">No recurring transactions yet</td></tr>'; return; }
   tbody.innerHTML=recurringData.map(r=>`<tr>
     <td><span class="badge badge-${r.type}">${r.type}</span></td>
     <td style="font-weight:600">${r.name}</td><td>${r.category}</td>
@@ -979,7 +1101,7 @@ function renderRecurringTable() {
     <td style="color:#666">${fmt(monthlyEquiv(r))}/mo</td>
     <td style="color:#888;font-size:0.82rem">${formatDate(r.startDate)}</td>
     <td style="color:#888;font-size:0.82rem">${r.endDate?formatDate(r.endDate):'—'}</td>
-    <td><button class="btn-sm-danger" onclick="deleteRecurring(${r.id})">Delete</button></td></tr>`).join('');
+    <td><button class="btn-sm-danger" onclick="deleteRecurring(${r.id})">Delete</button></td></tr>`).join('') + loanRows.join('');
 }
 function renderUpcomingTimeline() {
   const today=new Date(); today.setHours(0,0,0,0);
@@ -1329,6 +1451,137 @@ function deleteDeal(id) {
 }
 
 // ══════════════════════════════════════════════════
+//  LOANS
+// ══════════════════════════════════════════════════
+let editingLoanId = null;
+
+function renderLoansPage() {
+  const today = todayStr();
+  // Summary counts
+  const active = loansData.filter(l => !l.endDate || l.endDate >= today);
+  const completed = loansData.filter(l => l.endDate && l.endDate < today);
+  const totalBorrowed = loansData.reduce((s, l) => s + l.totalAmount, 0);
+  // Estimate monthly total from all active loans
+  const monthlyTotal = active.reduce((s, l) => s + monthlyEquiv({ amount: l.repaymentAmount, frequency: l.frequency }), 0);
+
+  document.getElementById('loans-active-count').textContent = active.length;
+  document.getElementById('loans-completed-count').textContent = completed.length;
+  document.getElementById('loans-total-amount').textContent = fmt(totalBorrowed);
+  document.getElementById('loans-monthly-total').textContent = fmt(monthlyTotal);
+
+  // Restore form state if editing
+  const formTitle = document.getElementById('loan-form-title');
+  const cancelBtn = document.getElementById('loan-cancel-btn');
+  if (editingLoanId !== null) {
+    formTitle.textContent = 'Edit Loan';
+    cancelBtn.style.display = '';
+    const loan = loansData.find(l => l.id === editingLoanId);
+    if (loan) {
+      document.getElementById('loan-lender').value = loan.lender;
+      document.getElementById('loan-total').value = loan.totalAmount;
+      document.getElementById('loan-repayment').value = loan.repaymentAmount;
+      document.getElementById('loan-frequency').value = loan.frequency;
+      document.getElementById('loan-apr').value = loan.apr || '';
+      document.getElementById('loan-start').value = loan.startDate;
+      document.getElementById('loan-end').value = loan.endDate || '';
+      document.getElementById('loan-note').value = loan.note || '';
+      document.getElementById('loan-edit-id').value = loan.id;
+    }
+  } else {
+    formTitle.textContent = 'Add a Loan';
+    cancelBtn.style.display = 'none';
+  }
+
+  const tbody = document.getElementById('loans-table-body');
+  if (!loansData.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No loans saved yet. Add your first loan above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = loansData.map(l => {
+    const isActive = !l.endDate || l.endDate >= today;
+    return `<tr>
+      <td style="font-weight:600">${l.lender}</td>
+      <td>${fmt(l.totalAmount)}</td>
+      <td style="font-weight:600">${fmt(l.repaymentAmount)}</td>
+      <td><span class="badge badge-freq">${FREQ_LABELS[l.frequency] || l.frequency}</span></td>
+      <td style="color:#888">${l.apr ? l.apr + '%' : '—'}</td>
+      <td style="color:#888;font-size:0.82rem">${formatDate(l.startDate)}</td>
+      <td style="color:#888;font-size:0.82rem">${l.endDate ? formatDate(l.endDate) : '—'}</td>
+      <td style="color:#888;font-size:0.82rem">${l.note || '—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm" onclick="editLoan(${l.id})" style="margin-right:4px">Edit</button>
+        <button class="btn-sm-danger" onclick="deleteLoan(${l.id})">Delete</button>
+      </td></tr>`;
+  }).join('');
+}
+
+function saveLoan() {
+  const lender = document.getElementById('loan-lender').value.trim();
+  const totalAmount = parseFloat(document.getElementById('loan-total').value);
+  const repaymentAmount = parseFloat(document.getElementById('loan-repayment').value);
+  const frequency = document.getElementById('loan-frequency').value;
+  const apr = document.getElementById('loan-apr').value ? parseFloat(document.getElementById('loan-apr').value) : null;
+  const startDate = document.getElementById('loan-start').value;
+  const endDate = document.getElementById('loan-end').value || null;
+  const note = document.getElementById('loan-note').value.trim();
+
+  if (!lender) { toast('⚠️ Please enter a lender name'); return; }
+  if (!totalAmount || totalAmount <= 0) { toast('⚠️ Please enter a valid total loan amount'); return; }
+  if (!repaymentAmount || repaymentAmount <= 0) { toast('⚠️ Please enter a valid repayment amount'); return; }
+  if (!startDate) { toast('⚠️ Please enter a start date'); return; }
+
+  const editId = document.getElementById('loan-edit-id').value;
+  if (editId) {
+    const idx = loansData.findIndex(l => l.id === parseInt(editId));
+    if (idx !== -1) loansData[idx] = { ...loansData[idx], lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note };
+    editingLoanId = null;
+    toast('✅ Loan updated');
+  } else {
+    const id = Date.now();
+    loansData.push({ id, lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note });
+    toast('✅ Loan saved');
+  }
+  saveData();
+  clearLoanForm();
+  renderLoansPage();
+  renderRecurringTable();
+}
+
+function clearLoanForm() {
+  ['loan-lender','loan-total','loan-repayment','loan-apr','loan-start','loan-end','loan-note'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('loan-frequency').value = 'monthly';
+  document.getElementById('loan-edit-id').value = '';
+  document.getElementById('loan-cancel-btn').style.display = 'none';
+  document.getElementById('loan-form-title').textContent = 'Add a Loan';
+  // Reset start date to today
+  const startEl = document.getElementById('loan-start');
+  if (startEl) startEl.value = todayStr();
+  editingLoanId = null;
+}
+
+function editLoan(id) {
+  editingLoanId = id;
+  renderLoansPage();
+  document.getElementById('loans-form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelLoanEdit() {
+  editingLoanId = null;
+  clearLoanForm();
+  renderLoansPage();
+}
+
+function deleteLoan(id) {
+  loansData = loansData.filter(l => l.id !== id);
+  saveData();
+  renderLoansPage();
+  renderRecurringTable();
+  toast('🗑 Loan deleted');
+}
+
+// ══════════════════════════════════════════════════
 //  CALCULATORS
 // ══════════════════════════════════════════════════
 function switchCalcTab(tab, el) {
@@ -1555,8 +1808,31 @@ function renderCCTransactions() {
 }
 
 // ══════════════════════════════════════════════════
+//  COLLAPSIBLE NAV
+// ══════════════════════════════════════════════════
+function toggleNavGroup(key) {
+  const group = document.getElementById('navg-' + key);
+  if (!group) return;
+  group.classList.toggle('collapsed');
+  const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
+  states[key] = group.classList.contains('collapsed');
+  localStorage.setItem('mf_nav_state', JSON.stringify(states));
+}
+
+function restoreNavState() {
+  const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
+  Object.keys(states).forEach(key => {
+    if (states[key]) {
+      const g = document.getElementById('navg-' + key);
+      if (g) g.classList.add('collapsed');
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
+restoreNavState();
 setDefaultDates();
 renderDashboard();
 renderOneoffList();
