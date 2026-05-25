@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Single-file personal finance web app: **one file, `index.html`, ~1,500 lines**. No framework, no build step, no dependencies except optional CDN scripts. Deployed to GitHub Pages as-is. All data persists in `localStorage`. Open the file directly in a browser to test — no server needed.
+Single-file personal finance web app: **one file, `index.html`, ~1,846 lines**. No framework, no build step, no dependencies except optional CDN scripts. Deployed to GitHub Pages as-is. All data persists in `localStorage`. Open the file directly in a browser to test — no server needed.
 
 ## Git workflow
 
@@ -32,12 +32,19 @@ Pages are `<section class="page" id="page-{name}">` elements. Only one is `activ
 
 ```js
 const renders = {
-  dashboard, oneoff, recurring, cashflow, credit,
-  cctransactions, calculators, deals
+  dashboard: renderDashboard,
+  oneoff: renderOneoffList,
+  recurring: () => { renderRecurringTable(); renderUpcomingTimeline(); },
+  cashflow: renderCashflow,
+  credit: renderCardList,
+  cctransactions: renderCCTransactions,
+  calculators: () => {},   // static page, no render needed
+  deals: renderDealsPage,
+  loans: renderLoansPage
 };
 ```
 
-Adding a new page requires: (1) sidebar nav item, (2) `<section id="page-{name}">` in `<main>`, (3) entry in the `renders` map, (4) `renderXxx()` function.
+Adding a new page requires: (1) sidebar nav item, (2) `<section id="page-{name}">` in `<main>`, (3) entry in the `renders` map, (4) `renderXxx()` function. If the new page is in a nav subsection, also add it to `setDefaultDates()` if it uses date inputs.
 
 ### Data model
 
@@ -51,10 +58,11 @@ All state is module-level `let` variables, loaded once on startup, saved via `sa
 | `creditCards` | `mf_cards` | `[{id, name, balance, apr, minType, minPct, minFloor, minFixed}]` |
 | `interestFreeDeals` | `mf_deals` | `[{id, cardId, amount, startDate, endDate, note}]` |
 | `ccTransactions` | `mf_cc_transactions` | `[{id, cardId, date, amount, category, description, type}]` where `type` is `'charge'` or `'payment'` |
+| `loansData` | `mf_loans` | `[{id, lender, totalAmount, repaymentAmount, apr, frequency, startDate, endDate, note}]` |
 
 **IDs** are always `Date.now()` integers. **Dates** are always `YYYY-MM-DD` strings; always parse with `new Date(ds + 'T00:00:00')` to avoid timezone shifts.
 
-`saveData()` must be called after every mutation to any data variable. It writes all six arrays to `localStorage` in one pass.
+`saveData()` must be called after every mutation to any data variable. It writes all seven arrays to `localStorage` in one pass.
 
 #### Data migration
 
@@ -103,21 +111,29 @@ All colours use hex literals (no CSS variables for theme colours yet). Key class
 
 | Section | ~Line |
 |---|---|
-| DATA + saveData | 562 |
-| NAVIGATION | 592 |
-| HELPERS (fmt, toast, dates) | 614 |
-| CASHFLOW ENGINE (generateProjection) | 698 |
-| DASHBOARD | 812 |
-| ONE-OFF TRANSACTIONS | 862 |
-| RECURRING | 951 |
-| CASHFLOW RENDER | 1011 |
-| CREDIT CARDS | 1081 |
-| 0% DEALS | 1178 |
-| CALCULATORS | 1332 |
-| CARD TRANSACTIONS | 1393 |
-| INIT (setDefaultDates, renderDashboard) | ~end |
+| DATA + saveData | 662 |
+| NAVIGATION | 694 |
+| HELPERS (fmt, toast, dates) | 718 |
+| DEALS helper (getInterestFreeAmount) | 750 |
+| RECURRING date generation | 767 |
+| CASHFLOW ENGINE (generateProjection) | 801 |
+| DASHBOARD | 921 |
+| ONE-OFF TRANSACTIONS | 971 |
+| RECURRING | 1060 |
+| CASHFLOW RENDER | 1130 |
+| CREDIT CARDS | 1200 |
+| 0% DEALS | 1298 |
+| LOANS | 1451 |
+| CALCULATORS | 1582 |
+| CARD TRANSACTIONS | 1643 |
+| COLLAPSIBLE NAV | 1808 |
+| INIT (restoreNavState, setDefaultDates, renderDashboard) | 1838 |
 
 Use `grep -n "//  SECTION NAME"` to find the current line of any section quickly.
+
+### Collapsible navigation
+
+The sidebar nav is grouped into four top-level sections (`overview`, `transactions`, `debt`, `planning`), each a `.nav-group` with id `navg-{key}`. `toggleNavGroup(key)` toggles the `.collapsed` class and sets `style.display` on the inner `.nav-group-items` div. `restoreNavState()` reads the `mf_nav_state` localStorage key (`{key: bool}`) and restores collapse state on startup — it is called as the first line of the INIT block. The Debt section contains two subsections (Credit Cards, Loans) which are also independently collapsible via `toggleNavSubgroup(key)` with ids `navg-sub-creditcards` and `navg-sub-loans`, persisted under the same `mf_nav_state` key.
 
 ## Efficient editing approach
 
