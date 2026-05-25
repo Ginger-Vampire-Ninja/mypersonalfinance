@@ -877,6 +877,7 @@ function navigate(page) {
     loans: renderLoansPage
   };
   if (renders[page]) renders[page]();
+  if (window.posthog) posthog.capture('page_viewed', { page });
 }
 
 // ══════════════════════════════════════════════════
@@ -1163,6 +1164,7 @@ function addOneoff() {
   const entry = { id:Date.now(), date, category:cat, amount:amt, description:desc||cat };
   if (currentOneoffType==='income') { incomeData.push(entry); } else { expenseData.push(entry); }
   saveData(); renderOneoffList(); toast('✅ Entry added!');
+  if (window.posthog) posthog.capture('transaction_added', { type: currentOneoffType, category: cat });
   document.getElementById('oneoff-amount').value=''; document.getElementById('oneoff-description').value='';
 }
 
@@ -1239,6 +1241,7 @@ function addRecurring() {
   if (!start) { toast('⚠️ Pick a start date'); return; }
   recurringData.push({ id:Date.now(), type:currentRecType, name, category:cat, amount:amt, frequency:freq, startDate:start, endDate:end||null });
   saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('✅ Recurring transaction added!');
+  if (window.posthog) posthog.capture('recurring_added', { type: currentRecType, frequency: freq, category: cat });
   document.getElementById('rec-name').value=''; document.getElementById('rec-amount').value=''; document.getElementById('rec-end').value='';
 }
 function deleteRecurring(id) { recurringData=recurringData.filter(r=>r.id!==id); saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted'); }
@@ -1297,6 +1300,7 @@ function switchRecTab(tab, el) {
 function renderCashflow() {
   const numMonths=parseInt(document.getElementById('cf-months-select').value);
   const rows=generateProjection(numMonths);
+  if (window.posthog) posthog.capture('cashflow_viewed', { months: numMonths });
 
   const avgInc   =recurringData.filter(r=>r.type==='income').reduce((s,r)=>s+monthlyEquiv(r),0);
   const avgExp   =recurringData.filter(r=>r.type==='expense').reduce((s,r)=>s+monthlyEquiv(r),0);
@@ -1387,6 +1391,7 @@ function saveCard() {
   const card={ id:editId?parseInt(editId):Date.now(), name, balance, apr, minType, minPct, minFloor, minFixed };
   if (editId) creditCards=creditCards.map(c=>c.id===card.id?card:c); else creditCards.push(card);
   saveData(); renderCardList(); clearCardForm(); toast(editId?'✅ Card updated!':'✅ Card saved!');
+  if (window.posthog) posthog.capture('card_saved', { is_edit: !!editId, min_type: minType });
 }
 function clearCardForm() {
   ['cc-name','cc-balance','cc-apr','cc-min-pct','cc-min-fixed'].forEach(id=>document.getElementById(id).value='');
@@ -1698,10 +1703,12 @@ function saveLoan() {
     if (idx !== -1) loansData[idx] = { ...loansData[idx], lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note };
     editingLoanId = null;
     toast('✅ Loan updated');
+    if (window.posthog) posthog.capture('loan_saved', { is_edit: true, frequency });
   } else {
     const id = Date.now();
     loansData.push({ id, lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note });
     toast('✅ Loan saved');
+    if (window.posthog) posthog.capture('loan_saved', { is_edit: false, frequency });
   }
   saveData();
   clearLoanForm();
@@ -1842,6 +1849,7 @@ function addCCTransaction() {
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
   ccTransactions.push({ id: Date.now(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type });
   saveData(); renderCCTransactions(); toast(type === 'charge' ? '✅ Charge added!' : '✅ Payment recorded!');
+  if (window.posthog) posthog.capture('cc_transaction_added', { type, category: cat });
   document.getElementById('cct-amount').value = '';
   document.getElementById('cct-description').value = '';
 }
@@ -2045,6 +2053,14 @@ restoreNavState();
 setDefaultDates();
 renderDashboard();
 renderOneoffList();
+
+// Error telemetry
+window.onerror = function(msg, src, line, col, err) {
+  if (window.posthog) posthog.capture('js_error', { message: msg, source: src, line, col, stack: err && err.stack });
+};
+window.onunhandledrejection = function(e) {
+  if (window.posthog) posthog.capture('js_error', { message: 'Unhandled promise rejection: ' + e.reason, type: 'promise' });
+};
 </script>
 </body>
 </html>
