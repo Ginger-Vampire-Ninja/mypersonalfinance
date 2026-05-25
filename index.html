@@ -10,27 +10,36 @@
     .app { display: flex; min-height: 100vh; }
 
     /* Sidebar */
-    .sidebar { width: 230px; background: #1a1a2e; color: #fff; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar { width: 230px; background: #1a1a2e; color: #fff; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: transform 0.25s ease; }
+    .app.sidebar-collapsed .sidebar { transform: translateX(-230px); }
+    .app.sidebar-collapsed .main { margin-left: 0; }
+    /* Toggle button — always visible, floats at top-left */
+    .sidebar-toggle { position: fixed; top: 14px; left: 14px; z-index: 200; background: #1a1a2e; border: 1px solid #2d2d4e; color: #8b8bcc; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: left 0.25s ease, background 0.15s; user-select: none; }
+    .sidebar-toggle:hover { background: #2d2d4e; color: #fff; }
+    .app:not(.sidebar-collapsed) .sidebar-toggle { left: 196px; }
     .sidebar-logo { padding: 24px 22px 18px; font-size: 1.25rem; font-weight: 700; border-bottom: 1px solid #2d2d4e; }
     .sidebar-logo span { color: #6c63ff; }
     .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
-    .nav-section { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px 22px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #444; font-weight: 700; cursor: pointer; user-select: none; }
+    .nav-section { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px 22px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #8b8bcc; font-weight: 700; cursor: pointer; user-select: none; }
     .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 22px; cursor: pointer; font-size: 0.9rem; color: #999; transition: all 0.15s; border-left: 3px solid transparent; }
     .nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
     .nav-item.active { color: #fff; background: rgba(108,99,255,0.15); border-left-color: #6c63ff; }
     .nav-item .icon { font-size: 1rem; width: 18px; text-align: center; }
     /* Sub-section header inside a nav group */
-    .nav-subsection { padding: 8px 22px 3px 26px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.8px; color: #3d3d5e; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-    .nav-subsection::before { content: ''; display: inline-block; width: 12px; height: 1px; background: #3d3d5e; }
+    .nav-subsection { padding: 8px 22px 3px 26px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.8px; color: #6b6b9e; font-weight: 700; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+    .nav-subsection::before { content: ''; display: inline-block; width: 12px; height: 1px; background: #6b6b9e; flex-shrink: 0; }
     /* Indented child items under a sub-section */
     .nav-item.sub { padding-left: 34px; font-size: 0.85rem; }
-    /* Collapsible nav groups */
-    .nav-chevron { font-size: 0.65rem; opacity: 0.45; transition: transform 0.2s; flex-shrink: 0; display: inline-block; }
-    .nav-group.collapsed .nav-chevron { transform: rotate(-90deg); }
+    /* Collapsible nav groups — CSS drives visibility, JS only toggles the class */
+    .nav-chevron { font-size: 0.65rem; opacity: 0.6; transition: transform 0.2s; flex-shrink: 0; display: inline-block; }
+    .nav-group.collapsed .nav-group-items { display: none; }
+    .nav-group.collapsed > .nav-section .nav-chevron { transform: rotate(-90deg); }
+    .nav-subgroup.collapsed .nav-subgroup-items { display: none; }
+    .nav-subgroup.collapsed > .nav-subsection .nav-chevron { transform: rotate(-90deg); }
     .sidebar-footer { padding: 14px 22px; font-size: 0.72rem; color: #444; border-top: 1px solid #2d2d4e; }
 
     /* Main */
-    .main { margin-left: 230px; flex: 1; padding: 28px 32px; }
+    .main { margin-left: 230px; flex: 1; padding: 28px 32px; transition: margin-left 0.25s ease; }
     .page { display: none; }
     .page.active { display: block; }
     .page-header { margin-bottom: 24px; }
@@ -183,6 +192,9 @@
 <body>
 <div class="app">
 
+  <!-- Sidebar toggle -->
+  <div class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</div>
+
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-logo">My<span>Finance</span></div>
@@ -206,13 +218,21 @@
       <div class="nav-group" id="navg-debt">
         <div class="nav-section" onclick="toggleNavGroup('debt')">Debt <span class="nav-chevron">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-subsection">Credit Cards</div>
-          <div class="nav-item sub" onclick="navigate('credit')"><span class="icon">💳</span> Manage Credit Cards</div>
-          <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Manage CC Transactions</div>
-          <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Manage Interest Free Periods</div>
-          <div class="nav-item sub" onclick="navigate('calculators')"><span class="icon">🧮</span> Calculators</div>
-          <div class="nav-subsection">Loans</div>
-          <div class="nav-item sub" onclick="navigate('loans')"><span class="icon">🏦</span> Manage Loans</div>
+          <div class="nav-subgroup" id="navg-sub-creditcards">
+            <div class="nav-subsection" onclick="toggleNavSubgroup('creditcards')"><span>Credit Cards</span> <span class="nav-chevron">▾</span></div>
+            <div class="nav-subgroup-items">
+              <div class="nav-item sub" onclick="navigate('credit')"><span class="icon">💳</span> Manage Credit Cards</div>
+              <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Manage CC Transactions</div>
+              <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Manage Interest Free Periods</div>
+              <div class="nav-item sub" onclick="navigate('calculators')"><span class="icon">🧮</span> Calculators</div>
+            </div>
+          </div>
+          <div class="nav-subgroup" id="navg-sub-loans">
+            <div class="nav-subsection" onclick="toggleNavSubgroup('loans')"><span>Loans</span> <span class="nav-chevron">▾</span></div>
+            <div class="nav-subgroup-items">
+              <div class="nav-item sub" onclick="navigate('loans')"><span class="icon">🏦</span> Manage Loans</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1807,14 +1827,33 @@ function renderCCTransactions() {
 // ══════════════════════════════════════════════════
 //  COLLAPSIBLE NAV
 // ══════════════════════════════════════════════════
+function toggleSidebar() {
+  const app = document.querySelector('.app');
+  const isNowCollapsed = app.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('mf_sidebar_collapsed', isNowCollapsed ? '1' : '0');
+}
+
+function restoreSidebarState() {
+  if (localStorage.getItem('mf_sidebar_collapsed') === '1') {
+    document.querySelector('.app').classList.add('sidebar-collapsed');
+  }
+}
+
 function toggleNavGroup(key) {
   const group = document.getElementById('navg-' + key);
   if (!group) return;
-  const items = group.querySelector('.nav-group-items');
   const isNowCollapsed = group.classList.toggle('collapsed');
-  if (items) items.style.display = isNowCollapsed ? 'none' : 'block';
   const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
   states[key] = isNowCollapsed;
+  localStorage.setItem('mf_nav_state', JSON.stringify(states));
+}
+
+function toggleNavSubgroup(key) {
+  const group = document.getElementById('navg-sub-' + key);
+  if (!group) return;
+  const isNowCollapsed = group.classList.toggle('collapsed');
+  const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
+  states['sub-' + key] = isNowCollapsed;
   localStorage.setItem('mf_nav_state', JSON.stringify(states));
 }
 
@@ -1823,20 +1862,19 @@ function restoreNavState() {
   ['overview','transactions','debt','planning'].forEach(key => {
     const g = document.getElementById('navg-' + key);
     if (!g) return;
-    const items = g.querySelector('.nav-group-items');
-    if (states[key] === true) {
-      g.classList.add('collapsed');
-      if (items) items.style.display = 'none';
-    } else {
-      g.classList.remove('collapsed');
-      if (items) items.style.display = 'block';
-    }
+    g.classList.toggle('collapsed', states[key] === true);
+  });
+  ['creditcards','loans'].forEach(key => {
+    const g = document.getElementById('navg-sub-' + key);
+    if (!g) return;
+    g.classList.toggle('collapsed', states['sub-' + key] === true);
   });
 }
 
 // ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
+restoreSidebarState();
 restoreNavState();
 setDefaultDates();
 renderDashboard();
