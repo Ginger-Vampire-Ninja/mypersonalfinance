@@ -3,29 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Finaura – Free Personal Finance Manager</title>
-
-  <!-- SEO -->
-  <meta name="description" content="Track income, expenses, credit cards and loans. Plan your cashflow months ahead. No account needed — your data never leaves your browser. Free forever.">
-  <meta name="keywords" content="personal finance, budget tracker, cashflow forecast, credit card tracker, loan tracker, free finance app">
-  <meta name="author" content="Finaura">
-
-  <!-- Open Graph (Facebook, LinkedIn, Reddit, WhatsApp previews) -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://ginger-vampire-ninja.github.io/mypersonalfinance/">
-  <meta property="og:title" content="Finaura – Free Personal Finance Manager">
-  <meta property="og:description" content="Track income, expenses, credit cards and loans. Plan your cashflow months ahead. No account needed — your data never leaves your browser.">
-  <meta property="og:image" content="https://ginger-vampire-ninja.github.io/mypersonalfinance/og-image.svg">
-
-  <!-- Twitter / X Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Finaura – Free Personal Finance Manager">
-  <meta name="twitter:description" content="Track income, expenses, credit cards and loans. Cashflow forecasting built in. No account, no server — 100% private.">
-  <meta name="twitter:image" content="https://ginger-vampire-ninja.github.io/mypersonalfinance/og-image.svg">
-
-  <!-- Canonical -->
-  <link rel="canonical" href="https://ginger-vampire-ninja.github.io/mypersonalfinance/">
-
+  <title>MyFinance – Personal Finance Manager</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
@@ -209,132 +187,9 @@
     .cct-edit-input { padding: 5px 8px; border: 1.5px solid #6c63ff; border-radius: 6px; font-size: 0.84rem; width: 100%; background: #fff; outline: none; box-sizing: border-box; }
     .cct-edit-input:focus { border-color: #574fd6; }
     .badge-card { background: #ede9fe; color: #7c3aed; }
-
-    /* ── Landing overlay ── */
-    #landing-overlay { position: fixed; inset: 0; z-index: 10000; background: #0e0e1a; color: #fff; overflow-y: auto; display: flex; flex-direction: column; }
-    #landing-overlay.hidden { display: none; }
-    .lp-nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-    .lp-logo { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.5px; }
-    .lp-logo span { color: #6c63ff; }
-    .lp-nav-cta { background: #6c63ff; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-    .lp-nav-cta:hover { background: #574fd6; }
-    .lp-hero { text-align: center; padding: 80px 24px 60px; max-width: 720px; margin: 0 auto; }
-    .lp-hero-badge { display: inline-block; background: rgba(108,99,255,0.15); color: #a5a0ff; border: 1px solid rgba(108,99,255,0.3); border-radius: 20px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 14px; margin-bottom: 24px; }
-    .lp-hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
-    .lp-hero h1 span { color: #6c63ff; }
-    .lp-hero p { font-size: 1.1rem; color: #9ca3af; line-height: 1.7; margin-bottom: 36px; max-width: 540px; margin-left: auto; margin-right: auto; }
-    .lp-cta-group { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .lp-btn-primary { background: #6c63ff; color: #fff; border: none; padding: 14px 32px; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.1s; }
-    .lp-btn-primary:hover { background: #574fd6; transform: translateY(-1px); }
-    .lp-btn-secondary { background: transparent; color: #9ca3af; border: 1.5px solid rgba(255,255,255,0.15); padding: 14px 28px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
-    .lp-btn-secondary:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
-    .lp-privacy-note { margin-top: 16px; font-size: 0.8rem; color: #6b7280; }
-    .lp-features { padding: 60px 24px; max-width: 1000px; margin: 0 auto; width: 100%; }
-    .lp-features h2 { text-align: center; font-size: 1.75rem; font-weight: 800; margin-bottom: 8px; }
-    .lp-features .lp-subtitle { text-align: center; color: #9ca3af; margin-bottom: 48px; font-size: 1rem; }
-    .lp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-    .lp-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 28px 24px; transition: border-color 0.2s; }
-    .lp-card:hover { border-color: rgba(108,99,255,0.4); }
-    .lp-card-icon { font-size: 1.8rem; margin-bottom: 14px; }
-    .lp-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
-    .lp-card p { font-size: 0.88rem; color: #9ca3af; line-height: 1.6; }
-    .lp-trust { background: rgba(108,99,255,0.07); border-top: 1px solid rgba(108,99,255,0.15); border-bottom: 1px solid rgba(108,99,255,0.15); padding: 60px 24px; text-align: center; }
-    .lp-trust h2 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
-    .lp-trust p { color: #9ca3af; max-width: 520px; margin: 0 auto 32px; line-height: 1.7; }
-    .lp-trust-pills { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .lp-pill { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 30px; padding: 8px 18px; font-size: 0.82rem; font-weight: 600; color: #d1d5db; }
-    .lp-final-cta { text-align: center; padding: 80px 24px; }
-    .lp-final-cta h2 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
-    .lp-final-cta p { color: #9ca3af; margin-bottom: 32px; font-size: 1rem; }
-    .lp-footer { text-align: center; padding: 20px 24px 32px; color: #4b5563; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06); }
   </style>
 </head>
 <body>
-
-<!-- ═══════════════════════════════════════════════════════════
-     LANDING PAGE OVERLAY  — shown on first visit only
-════════════════════════════════════════════════════════════ -->
-<div id="landing-overlay">
-
-  <nav class="lp-nav">
-    <div class="lp-logo">Fin<span>aura</span></div>
-    <button class="lp-nav-cta" onclick="launchApp()">Launch App — Free</button>
-  </nav>
-
-  <div class="lp-hero">
-    <div class="lp-hero-badge">🔒 No account · No server · Free forever</div>
-    <h1>Take control of your <span>finances</span></h1>
-    <p>Track income, expenses, credit cards and loans. See your cashflow months ahead. Everything stays in your browser — no sign-up, no subscription, no data ever leaves your device.</p>
-    <div class="lp-cta-group">
-      <button class="lp-btn-primary" onclick="launchApp()">Launch App — It's Free</button>
-      <button class="lp-btn-secondary" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">See Features ↓</button>
-    </div>
-    <p class="lp-privacy-note">🔒 Your data is stored only in your browser. We never see it.</p>
-  </div>
-
-  <div class="lp-features" id="lp-features">
-    <h2>Everything you need, nothing you don't</h2>
-    <p class="lp-subtitle">Six powerful tools in one lightweight app — no install required.</p>
-    <div class="lp-grid">
-      <div class="lp-card">
-        <div class="lp-card-icon">📈</div>
-        <h3>Cashflow Forecasting</h3>
-        <p>See your projected income and expenses up to 24 months ahead. Recurring items, one-offs, and credit card payments all factored in automatically.</p>
-      </div>
-      <div class="lp-card">
-        <div class="lp-card-icon">💳</div>
-        <h3>Credit Card Tracker</h3>
-        <p>Track balances and APRs across multiple cards. Model payoff scenarios with the built-in calculator and track 0% interest-free promotional periods.</p>
-      </div>
-      <div class="lp-card">
-        <div class="lp-card-icon">🔁</div>
-        <h3>Recurring Transactions</h3>
-        <p>Set up regular income and expenses — salary, rent, subscriptions — and see their impact on your monthly cashflow automatically.</p>
-      </div>
-      <div class="lp-card">
-        <div class="lp-card-icon">🏦</div>
-        <h3>Loan Management</h3>
-        <p>Track loans and repayment schedules. Repayments flow automatically into your cashflow forecast so nothing is missed.</p>
-      </div>
-      <div class="lp-card">
-        <div class="lp-card-icon">📋</div>
-        <h3>One-off Transactions</h3>
-        <p>Log irregular income and expenses. Future-dated entries automatically appear in your cashflow projection at the right month.</p>
-      </div>
-      <div class="lp-card">
-        <div class="lp-card-icon">🧮</div>
-        <h3>Debt Calculators</h3>
-        <p>Understand the real cost of debt. See how long minimum payments take, model fixed payoff plans, and compare interest costs side by side.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="lp-trust">
-    <h2>🔒 Your data never leaves your device</h2>
-    <p>MyFinance stores everything in your browser's local storage. There is no server, no database, no account. We literally cannot see your financial data — even if we wanted to.</p>
-    <div class="lp-trust-pills">
-      <span class="lp-pill">✓ No sign-up required</span>
-      <span class="lp-pill">✓ No subscription</span>
-      <span class="lp-pill">✓ No ads</span>
-      <span class="lp-pill">✓ No data sent anywhere</span>
-      <span class="lp-pill">✓ Works offline</span>
-      <span class="lp-pill">✓ Open source</span>
-    </div>
-  </div>
-
-  <div class="lp-final-cta">
-    <h2>Ready to take control?</h2>
-    <p>Free forever. No account needed. Start in seconds.</p>
-    <button class="lp-btn-primary" style="font-size:1.1rem;padding:16px 40px" onclick="launchApp()">Launch Finaura — Free</button>
-  </div>
-
-  <div class="lp-footer">
-    Built with ♥ · Data stays in your browser · Free forever
-  </div>
-
-</div>
-<!-- end landing overlay -->
-
 <div class="app">
 
   <!-- Sidebar toggle -->
@@ -342,7 +197,7 @@
 
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sidebar-logo">Fin<span>aura</span></div>
+    <div class="sidebar-logo">My<span>Finance</span></div>
     <nav class="sidebar-nav">
 
       <div class="nav-group" id="navg-overview">
@@ -1969,82 +1824,4 @@ function renderCCTransactions() {
   }).join('');
 }
 
-// ══════════════════════════════════════════════════
-//  COLLAPSIBLE NAV
-// ══════════════════════════════════════════════════
-function toggleSidebar() {
-  const app = document.querySelector('.app');
-  const isNowCollapsed = app.classList.toggle('sidebar-collapsed');
-  localStorage.setItem('mf_sidebar_collapsed', isNowCollapsed ? '1' : '0');
-}
-
-function restoreSidebarState() {
-  if (localStorage.getItem('mf_sidebar_collapsed') === '1') {
-    document.querySelector('.app').classList.add('sidebar-collapsed');
-  }
-}
-
-function toggleNavGroup(key) {
-  const group = document.getElementById('navg-' + key);
-  if (!group) return;
-  const isNowCollapsed = group.classList.toggle('collapsed');
-  const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
-  states[key] = isNowCollapsed;
-  localStorage.setItem('mf_nav_state', JSON.stringify(states));
-}
-
-function toggleNavSubgroup(key) {
-  const group = document.getElementById('navg-sub-' + key);
-  if (!group) return;
-  const isNowCollapsed = group.classList.toggle('collapsed');
-  const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
-  states['sub-' + key] = isNowCollapsed;
-  localStorage.setItem('mf_nav_state', JSON.stringify(states));
-}
-
-function restoreNavState() {
-  const states = JSON.parse(localStorage.getItem('mf_nav_state') || '{}');
-  ['overview','transactions','debt','planning'].forEach(key => {
-    const g = document.getElementById('navg-' + key);
-    if (!g) return;
-    g.classList.toggle('collapsed', states[key] === true);
-  });
-  ['creditcards','loans'].forEach(key => {
-    const g = document.getElementById('navg-sub-' + key);
-    if (!g) return;
-    g.classList.toggle('collapsed', states['sub-' + key] === true);
-  });
-}
-
-// ══════════════════════════════════════════════════
-//  LANDING PAGE
-// ══════════════════════════════════════════════════
-function launchApp() {
-  localStorage.setItem('mf_launched', '1');
-  document.getElementById('landing-overlay').classList.add('hidden');
-}
-
-function checkFirstVisit() {
-  // Show landing overlay if user has never launched the app before
-  // Skip it if they already have data (existing users who update the app)
-  const hasLaunched  = localStorage.getItem('mf_launched');
-  const hasData      = localStorage.getItem('mf_income') ||
-                       localStorage.getItem('mf_recurring') ||
-                       localStorage.getItem('mf_cards');
-  if (hasLaunched || hasData) {
-    document.getElementById('landing-overlay').classList.add('hidden');
-  }
-}
-
-// ══════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════
-checkFirstVisit();
-restoreSidebarState();
-restoreNavState();
-setDefaultDates();
-renderDashboard();
-renderOneoffList();
-</script>
-</body>
-</html>
+// ════════════════════�

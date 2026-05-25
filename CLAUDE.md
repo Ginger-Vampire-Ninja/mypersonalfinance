@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Single-file personal finance web app: **one file, `index.html`, ~1,846 lines**. No framework, no build step, no dependencies except optional CDN scripts. Deployed to GitHub Pages as-is. All data persists in `localStorage`. Open the file directly in a browser to test — no server needed.
+Single-file personal finance web app called **Finaura**: **one file, `index.html`, ~2,050 lines**. No framework, no build step, no dependencies except optional CDN scripts. Deployed to GitHub Pages as-is. All data persists in `localStorage`. Open the file directly in a browser to test — no server needed.
 
 ## Git workflow
 
