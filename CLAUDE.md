@@ -4,13 +4,15 @@ This file provides guidance to Claude when working with code in this repository.
 
 ## Project overview
 
-Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is a single file — `index.html`, ~2,066 lines. No framework, no build step, no dependencies except PostHog (CDN) and optional CDN scripts. Deployed to GitHub Pages with a custom domain. All financial data persists in `localStorage`. Open `index.html` directly in a browser to test locally — no server needed.
+Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html` (615 lines), `styles.css` (221 lines), and `app.js` (1238 lines). No framework, no build step, no dependencies except PostHog (CDN) and optional CDN scripts. Deployed to GitHub Pages with a custom domain. All financial data persists in `localStorage`. Open `index.html` directly in a browser to test locally — no server needed.
 
 ## Repository files
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — CSS, HTML, and JS in one file |
+| `index.html` | Lean HTML shell — `<head>` with PostHog init, all `<section>` page markup, links to `styles.css` and `app.js` |
+| `styles.css` | All app styles — layout, sidebar, cards, tables, forms, cashflow colours, landing overlay |
+| `app.js` | All JavaScript — data model, navigation, render functions, event handlers, INIT |
 | `legal.html` | Terms of Service and Privacy Policy (standalone page) |
 | `og-image.svg` | 1200×630 Open Graph image for social sharing previews |
 | `CNAME` | Custom domain config (`finaura.app`) for GitHub Pages |
@@ -28,16 +30,30 @@ git branch
 git status
 ```
 
-**Important:** The bash sandbox mount of the repo is often stale — it may reflect an older version of `index.html`. Always use the `Read` tool (not bash `cat` or `wc -l`) to read the real current file content and get accurate line numbers.
+**Important:** The bash sandbox mount of the repo is often stale — it may reflect older versions of `index.html`, `styles.css`, and `app.js`. Always use the `Read` tool (not bash `cat` or `wc -l`) to read the real current file content and get accurate line numbers.
 
 ## Architecture
 
-`index.html` has four logical blocks:
+The app is split into three files served by GitHub Pages:
 
-1. **`<head>`** (lines ~1–28) — meta tags, SEO, Open Graph, PostHog analytics snippet, canonical URL
-2. **CSS** (`<style>`, lines ~29–260) — all styles inline, no external stylesheet. Includes landing overlay styles (`lp-*` classes)
-3. **HTML** (`<body>`, lines ~261–820) — landing overlay, sidebar, `<main>` with all page `<section>` elements
-4. **JavaScript** (`<script>`, lines ~821–end) — all logic inline
+- **`index.html`** (615 lines) — `<head>` (meta, SEO, Open Graph, PostHog init snippet, canonical URL), then `<body>` with the landing overlay, sidebar, and all `<section class="page">` elements. Ends with `<link rel="stylesheet" href="styles.css">` in `<head>` and `<script src="app.js"></script>` just before `</body>`.
+- **`styles.css`** (221 lines) — all styles inline. Teal sidebar (`#0F766E`), card depth, cashflow cell colours, landing overlay (`lp-*` classes).
+- **`app.js`** (1238 lines) — all JS logic. Sections are marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
+
+### PostHog analytics
+
+PostHog EU Cloud init snippet stays in `index.html` `<head>` — **never move it to `app.js`**. Key: `phc_yRHinZkin9DDzssWX3jiQMrFcCdgY3QKzFQtw45z3vYS`, host: `https://eu.i.posthog.com`. All capture calls in `app.js` are guarded with `if (window.posthog)` so they fail silently if the script is blocked.
+
+| Event | Fired in | Properties |
+|---|---|---|
+| `page_viewed` | `navigate()` | `page` |
+| `transaction_added` | `addOneoff()` | `type`, `category` |
+| `recurring_added` | `addRecurring()` | `type`, `frequency`, `category` |
+| `card_saved` | `saveCard()` | `is_edit`, `min_type` |
+| `loan_saved` | `saveLoan()` | `is_edit`, `frequency` |
+| `cashflow_viewed` | `renderCashflow()` | `months` |
+| `cc_transaction_added` | `addCCTransaction()` | `type`, `category` |
+| `js_error` | `window.onerror` / `onunhandledrejection` | `message`, `source`, `line`, `stack` |
 
 ### Landing page overlay
 
@@ -84,7 +100,7 @@ const renders = {
 
 `navigate()` also fires a `page_viewed` PostHog event.
 
-Adding a new page requires: (1) sidebar nav item, (2) `<section id="page-{name}">` in `<main>`, (3) entry in the `renders` map, (4) `renderXxx()` function. If the new page uses date inputs, add it to `setDefaultDates()`.
+Adding a new page requires: (1) sidebar nav item in `index.html`, (2) `<section id="page-{name}">` in `index.html` `<main>`, (3) entry in the `renders` map in `app.js`, (4) `renderXxx()` function in `app.js`. If the new page uses date inputs, add it to `setDefaultDates()`.
 
 ### Data model
 
@@ -116,22 +132,7 @@ All state is module-level `let` variables, loaded once on startup, saved via `sa
 
 `ccTransactions` was split from a legacy `mf_cc_payments` key. A self-invoking migration function at startup absorbs any old entries and removes the stale key. When adding new fields to existing objects, follow the same pattern: load with a `.map(x => ({ ...x, newField: x.newField ?? default }))` default.
 
-### PostHog analytics
-
-PostHog EU Cloud is initialised in `<head>` with key `phc_yRHinZkin9DDzssWX3jiQMrFcCdgY3QKzFQtw45z3vYS`. All capture calls are guarded with `if (window.posthog)` so they fail silently if the script is blocked.
-
-| Event | Fired in | Properties |
-|---|---|---|
-| `page_viewed` | `navigate()` | `page` |
-| `transaction_added` | `addOneoff()` | `type`, `category` |
-| `recurring_added` | `addRecurring()` | `type`, `frequency`, `category` |
-| `card_saved` | `saveCard()` | `is_edit`, `min_type` |
-| `loan_saved` | `saveLoan()` | `is_edit`, `frequency` |
-| `cashflow_viewed` | `renderCashflow()` | `months` |
-| `cc_transaction_added` | `addCCTransaction()` | `type`, `category` |
-| `js_error` | `window.onerror` / `onunhandledrejection` | `message`, `source`, `line`, `stack` |
-
-### Cashflow projection engine (`generateProjection`, line ~967)
+### Cashflow projection engine (`generateProjection`, line ~142 in `app.js`)
 
 Produces one row per month by rolling card balances forward. Order of operations per month is critical:
 
@@ -162,7 +163,7 @@ Interest-free deals are handled by `getInterestFreeAmount(cardId, monthStart)`, 
 
 ### CSS conventions
 
-All colours use hex literals (no CSS variables for theme colours yet). Key classes:
+All colours use hex literals (no CSS variables for theme colours yet). Sidebar is teal (`#0F766E`). Key classes:
 
 - `.badge-income` green, `.badge-expense` red, `.badge-freq` purple, `.badge-oneoff` amber, `.badge-card` light purple
 - `.btn-sm-ghost` neutral action, `.btn-sm-danger` destructive action
@@ -171,35 +172,35 @@ All colours use hex literals (no CSS variables for theme colours yet). Key class
 - `.no-cards-notice` — amber warning box used when a section requires cards to be set up first
 - `lp-*` classes — landing page overlay only; all prefixed `lp-` to avoid collisions with app styles
 
-### JS section locations (approximate line numbers)
+### JS section locations in `app.js` (approximate line numbers)
 
 | Section | ~Line |
 |---|---|
-| DATA + saveData | 827 |
-| NAVIGATION | 859 |
-| HELPERS (fmt, toast, dates) | 884 |
-| DEALS helper (getInterestFreeAmount) | 916 |
-| RECURRING date generation | 933 |
-| CASHFLOW ENGINE (generateProjection) | 967 |
-| DASHBOARD | 1087 |
-| ONE-OFF TRANSACTIONS | 1137 |
-| RECURRING | 1227 |
-| CASHFLOW RENDER | 1298 |
-| CREDIT CARDS | 1369 |
-| 0% DEALS | 1468 |
-| LOANS | 1621 |
-| CALCULATORS | 1754 |
-| CARD TRANSACTIONS | 1815 |
-| COLLAPSIBLE NAV (toggleSidebar, toggleNavGroup, toggleNavSubgroup, restoreNavState) | 1981 |
-| LANDING PAGE (launchApp, checkFirstVisit) | 2028 |
-| INIT | 2048 |
+| DATA + saveData | 2 |
+| NAVIGATION | 34 |
+| HELPERS (fmt, toast, dates) | 59 |
+| DEALS helper (getInterestFreeAmount) | 91 |
+| RECURRING date generation | 108 |
+| CASHFLOW ENGINE (generateProjection) | 142 |
+| DASHBOARD | 262 |
+| ONE-OFF TRANSACTIONS | 312 |
+| RECURRING | 402 |
+| CASHFLOW RENDER | 473 |
+| CREDIT CARDS | 544 |
+| 0% DEALS | 643 |
+| LOANS | 796 |
+| CALCULATORS | 929 |
+| CARD TRANSACTIONS | 990 |
+| COLLAPSIBLE NAV (toggleSidebar, toggleNavGroup, toggleNavSubgroup, restoreNavState) | 1156 |
+| LANDING PAGE (launchApp, checkFirstVisit) | 1203 |
+| INIT | 1223 |
 
-Use `grep -n "^//  "` to find the current line of any section quickly (double-space after `//`).
+Use `grep -n "^//  "` on `app.js` to find the current line of any section quickly (double-space after `//`).
 
 ## Efficient editing approach
 
-1. **Grep before reading** — use `grep -n "functionName\|id=\"element-id\""` to locate the exact lines needed before calling Read.
-2. **Read targeted ranges** — pass `offset` + `limit` to Read; avoid reading the whole file (it exceeds the single-read token limit).
+1. **Grep before reading** — use `grep -n "functionName\|id=\"element-id\""` on the relevant file (`app.js`, `styles.css`, or `index.html`) to locate the exact lines needed before calling Read.
+2. **Read targeted ranges** — pass `offset` + `limit` to Read; avoid reading the whole file.
 3. **Edit surgically** — prefer small `Edit` calls over large rewrites. When replacing a function, match on the full function signature + first line so the `old_string` is unique.
 4. **Verify with grep** — after adding a new data variable or function, grep to confirm no stale references to old names remain.
-5. **Don't trust bash line counts** — the bash sandbox mount is frequently stale. Use `Read` with known offsets to verify actual file content.
+5. **Don't trust bash line counts** — the bash sandbox mount is frequently stale. Use `Read` with known offsets to verify actual file content in `index.html`, `styles.css`, and `app.js`.
