@@ -87,6 +87,47 @@ const FREQ_MONTHLY = { weekly:52/12, fortnightly:26/12, monthly:1, quarterly:4/1
 const FREQ_LABELS  = { weekly:'Weekly', fortnightly:'Fortnightly', monthly:'Monthly', quarterly:'Quarterly', annually:'Annually' };
 function monthlyEquiv(item) { return item.amount * FREQ_MONTHLY[item.frequency]; }
 
+function getMonthTotals(data, nMonths) {
+  const now = new Date();
+  const months = [];
+  for (let i = nMonths - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    months.push({ key, total: 0 });
+  }
+  data.forEach(item => {
+    const m = months.find(mo => mo.key === item.date.substring(0,7));
+    if (m) m.total += item.amount;
+  });
+  return months.map(m => m.total);
+}
+
+function buildSparkline(values, color) {
+  const w = 72, h = 28, pad = 3;
+  const max = Math.max(...values, 0.01);
+  const min = Math.min(...values, 0);
+  const range = (max - min) || 1;
+  const n = values.length;
+  const pts = values.map((v, i) => {
+    const x = n < 2 ? w / 2 : (i / (n - 1)) * w;
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const lastX = n < 2 ? w / 2 : w;
+  const lastY = (pad + (1 - (values[n-1] - min) / range) * (h - pad * 2)).toFixed(1);
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:block;flex-shrink:0"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${lastX}" cy="${lastY}" r="2.5" fill="${color}"/></svg>`;
+}
+
+function trendBadge(curr, prev, lowerIsBetter) {
+  if (prev === 0 && curr === 0) return '';
+  if (prev === 0) return `<span class="dash-trend" style="color:#10B981">New this month</span>`;
+  const pct = Math.round(((curr - prev) / Math.abs(prev)) * 100);
+  const positive = lowerIsBetter ? pct <= 0 : pct >= 0;
+  const color = positive ? '#10B981' : '#ef4444';
+  const arrow = pct >= 0 ? '↑' : '↓';
+  return `<span class="dash-trend" style="color:${color}">${arrow} ${Math.abs(pct)}% vs last month</span>`;
+}
+
 // ══════════════════════════════════════════════════
 //  DEALS — helper to get total interest-free amount
 //  for a given card in a given month
@@ -277,6 +318,16 @@ function renderDashboard() {
   const recNet = recInc - recExp;
   document.getElementById('dash-recurring-net').textContent  = (recNet<0?'-':'+')+fmt(recNet);
   document.getElementById('dash-recurring-net').style.color  = recNet>=0?'#22c55e':'#ef4444';
+
+  const incMonths = getMonthTotals(incomeData, 6);
+  const expMonths = getMonthTotals(expenseData, 6);
+  const netMonths = incMonths.map((v, i) => v - expMonths[i]);
+  document.getElementById('dash-income-spark').innerHTML   = buildSparkline(incMonths, '#10B981');
+  document.getElementById('dash-expenses-spark').innerHTML = buildSparkline(expMonths, '#EF4444');
+  document.getElementById('dash-balance-spark').innerHTML  = buildSparkline(netMonths, '#0F766E');
+  document.getElementById('dash-income-trend').innerHTML   = trendBadge(incMonths[5], incMonths[4], false);
+  document.getElementById('dash-expenses-trend').innerHTML = trendBadge(expMonths[5], expMonths[4], true);
+  document.getElementById('dash-balance-trend').innerHTML  = trendBadge(netMonths[5], netMonths[4], false);
 
   const ri = [...incomeData].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-recent-income').innerHTML = ri.length
