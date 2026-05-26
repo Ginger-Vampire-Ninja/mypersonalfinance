@@ -10,9 +10,10 @@ Personal finance web app called **Finaura**, live at **https://finaura.app**. Th
 
 | File | Purpose |
 |---|---|
-| `index.html` | Lean HTML shell — `<head>` with PostHog init, all `<section>` page markup, links to `styles.css` and `app.js` |
+| `index.html` | Lean HTML shell — `<head>` with PostHog init, AdSense script, favicon link, inline SVG logo; all `<section>` page markup; links to `styles.css` and `app.js` |
 | `styles.css` | All app styles — layout, sidebar, cards, tables, forms, cashflow colours, landing overlay |
 | `app.js` | All JavaScript — data model, navigation, render functions, event handlers, INIT |
+| `favicon.svg` | Browser tab icon — teal rounded square with white F letterform and mint sparkline |
 | `legal.html` | Terms of Service and Privacy Policy (standalone page) |
 | `og-image.svg` | 1200×630 Open Graph image for social sharing previews |
 | `CNAME` | Custom domain config (`finaura.app`) for GitHub Pages |
@@ -36,7 +37,7 @@ git status
 
 The app is split into three files served by GitHub Pages:
 
-- **`index.html`** (615 lines) — `<head>` (meta, SEO, Open Graph, PostHog init snippet, canonical URL), then `<body>` with the landing overlay, sidebar, and all `<section class="page">` elements. Ends with `<link rel="stylesheet" href="styles.css">` in `<head>` and `<script src="app.js"></script>` just before `</body>`.
+- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (including inline SVG logo in `.lp-logo`), sidebar (with inline SVG logo in `.sidebar-logo`), and all `<section class="page">` elements. Ends with `<script src="app.js"></script>` just before `</body>`. **PostHog and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
 - **`styles.css`** (221 lines) — all styles inline. Teal sidebar (`#0F766E`), card depth, cashflow cell colours, landing overlay (`lp-*` classes).
 - **`app.js`** (1238 lines) — all JS logic. Sections are marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
 
@@ -73,12 +74,15 @@ The entire sidebar can be toggled via a `☰` button (`.sidebar-toggle`).
 
 ### Collapsible navigation
 
-The sidebar nav is grouped into four top-level sections (`overview`, `transactions`, `debt`, `planning`), each a `.nav-group` with id `navg-{key}`.
+The sidebar nav is grouped into four top-level sections (`overview`, `transactions`, `debt`, `planning`), each a `.nav-group` with id `navg-{key}`. Adjacent groups are separated by a subtle rule via `.nav-group + .nav-group { border-top: 1px solid rgba(255,255,255,0.1); }`.
 
 - `toggleNavGroup(key)` — toggles `.collapsed` class on the group. CSS rule `.nav-group.collapsed .nav-group-items { display: none; }` handles visibility. State persisted to `mf_nav_state` (`{key: bool}`).
 - `restoreNavState()` — restores all group and subgroup collapse states on startup.
 - The Debt section has two independently collapsible subsections (`navg-sub-creditcards`, `navg-sub-loans`) toggled via `toggleNavSubgroup(key)`. Persisted under `sub-creditcards` / `sub-loans` keys inside `mf_nav_state`.
 - **Pure CSS-class approach** — no `style.display` manipulation in JS for nav collapse. JS only adds/removes the `.collapsed` class.
+- **Mint dot indicator** — each `.nav-section` and `.nav-subsection` contains `<span class="nav-dot"></span>`. CSS sets it mint (`#2DD4BF`) when expanded, faded white (`rgba(255,255,255,0.3)`) when the group is collapsed.
+
+Current nav item labels (sidebar `index.html`): Dashboard · Recurring · One-off · Manage Credit Cards · Manage Transactions · Manage 0% Periods · Calculators · Manage Loans · Cashflow.
 
 ### Navigation / page model
 
@@ -163,8 +167,9 @@ Interest-free deals are handled by `getInterestFreeAmount(cardId, monthStart)`, 
 
 ### CSS conventions
 
-All colours use hex literals (no CSS variables for theme colours yet). Sidebar is teal (`#0F766E`). Key classes:
+All colours use hex literals (no CSS variables for theme colours yet). Sidebar is teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 
+- `.nav-dot` — mint dot in nav section/subsection headers; fades to white when group is collapsed
 - `.badge-income` green, `.badge-expense` red, `.badge-freq` purple, `.badge-oneoff` amber, `.badge-card` light purple
 - `.btn-sm-ghost` neutral action, `.btn-sm-danger` destructive action
 - `.cct-edit-input` — shared style for all inline edit inputs/selects
