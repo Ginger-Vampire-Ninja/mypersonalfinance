@@ -273,7 +273,7 @@ function renderDashboard() {
   document.getElementById('dash-expenses').textContent       = fmt(totalExp);
   document.getElementById('dash-expenses-count').textContent = expenseData.length + ' entries';
   document.getElementById('dash-balance').textContent        = (balance<0?'-':'')+fmt(balance);
-  document.getElementById('dash-balance').style.color        = balance>=0?'#6c63ff':'#ef4444';
+  document.getElementById('dash-balance').style.color        = balance>=0?'#0F766E':'#ef4444';
   const recNet = recInc - recExp;
   document.getElementById('dash-recurring-net').textContent  = (recNet<0?'-':'+')+fmt(recNet);
   document.getElementById('dash-recurring-net').style.color  = recNet>=0?'#22c55e':'#ef4444';
@@ -375,7 +375,7 @@ function renderOneoffList() {
   if (summaryEl) summaryEl.innerHTML =
     `<span style="color:#16a34a">+£${totalInc.toFixed(2)}</span> &nbsp;·&nbsp; `+
     `<span style="color:#dc2626">-£${totalExp.toFixed(2)}</span> &nbsp;·&nbsp; `+
-    `<span style="color:${net>=0?'#6c63ff':'#dc2626'};font-weight:700">Net: ${fmtS(net)}</span>`;
+    `<span style="color:${net>=0?'#0F766E':'#dc2626'};font-weight:700">Net: ${fmtS(net)}</span>`;
 
   if (!rows.length) { tbody.innerHTML='<tr><td colspan="7" class="empty-state">No entries yet</td></tr>'; return; }
   tbody.innerHTML = rows.map(r => {
