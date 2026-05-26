@@ -38,9 +38,16 @@
     });
   </script>
 
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1328069771735779"
-     crossorigin="anonymous"></script>
+  <!-- Google AdSense (production only — skipped on file:// to avoid hanging) -->
+  <script>
+    if (location.hostname === 'finaura.app') {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1328069771735779';
+      s.crossOrigin = 'anonymous';
+      document.head.appendChild(s);
+    }
+  </script>
 
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -212,10 +219,44 @@
     <section class="page active" id="page-dashboard">
       <div class="page-header"><h1>Dashboard</h1><p>Your financial snapshot at a glance</p></div>
       <div class="cards">
-        <div class="card"><div class="card-label">Total Income (one-off)</div><div class="card-value green" id="dash-income">£0.00</div><div class="card-sub" id="dash-income-count">0 entries</div></div>
-        <div class="card"><div class="card-label">Total Expenses (one-off)</div><div class="card-value red" id="dash-expenses">£0.00</div><div class="card-sub" id="dash-expenses-count">0 entries</div></div>
-        <div class="card"><div class="card-label">Net Balance</div><div class="card-value net-balance" id="dash-balance">£0.00</div><div class="card-sub">Income minus expenses</div></div>
-        <div class="card"><div class="card-label">Monthly Recurring (net)</div><div class="card-value" id="dash-recurring-net">£0.00</div><div class="card-sub">Approx. monthly surplus</div></div>
+        <div class="card">
+          <div class="card-label">Total Income (one-off)</div>
+          <div class="card-kpi-row">
+            <div class="card-value green" id="dash-income">£0.00</div>
+            <div id="dash-income-spark"></div>
+          </div>
+          <div class="card-kpi-footer">
+            <span class="card-sub" id="dash-income-count">0 entries</span>
+            <span id="dash-income-trend"></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Expenses (one-off)</div>
+          <div class="card-kpi-row">
+            <div class="card-value red" id="dash-expenses">£0.00</div>
+            <div id="dash-expenses-spark"></div>
+          </div>
+          <div class="card-kpi-footer">
+            <span class="card-sub" id="dash-expenses-count">0 entries</span>
+            <span id="dash-expenses-trend"></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Net Balance</div>
+          <div class="card-kpi-row">
+            <div class="card-value net-balance" id="dash-balance">£0.00</div>
+            <div id="dash-balance-spark"></div>
+          </div>
+          <div class="card-kpi-footer">
+            <span class="card-sub">Income minus expenses</span>
+            <span id="dash-balance-trend"></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Monthly Recurring (net)</div>
+          <div class="card-value" id="dash-recurring-net">£0.00</div>
+          <div class="card-sub">Approx. monthly surplus</div>
+        </div>
       </div>
       <div class="two-col">
         <div class="panel">

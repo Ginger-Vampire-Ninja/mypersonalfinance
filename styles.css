@@ -219,3 +219,7 @@ tr:hover td { background: #fafafa; }
 .lp-final-cta h2 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
 .lp-final-cta p { color: #9ca3af; margin-bottom: 32px; font-size: 1rem; }
 .lp-footer { text-align: center; padding: 20px 24px 32px; color: #4b5563; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06); }
+/* Dashboard KPI cards */
+.card-kpi-row { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 4px; }
+.card-kpi-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
+.dash-trend { font-size: 0.72rem; font-weight: 600; }
