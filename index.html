@@ -23,6 +23,9 @@
   <meta name="twitter:description" content="Track income, expenses, credit cards and loans. Cashflow forecasting built in. No account, no server — 100% private.">
   <meta name="twitter:image" content="https://finaura.app/og-image.svg">
 
+  <!-- Favicon -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
   <!-- Canonical -->
   <link rel="canonical" href="https://finaura.app/">
 
@@ -45,7 +48,17 @@
 <div id="landing-overlay">
 
   <nav class="lp-nav">
-    <div class="lp-logo">Fin<span>aura</span></div>
+    <div class="lp-logo">
+      <svg viewBox="0 0 158 34" height="30" xmlns="http://www.w3.org/2000/svg" aria-label="Finaura">
+        <rect x="0" y="1" width="32" height="32" rx="7" fill="#0F766E"/>
+        <rect x="8" y="9" width="16" height="3" rx="1.5" fill="white"/>
+        <rect x="8" y="9" width="3" height="17" rx="1.5" fill="white"/>
+        <rect x="8" y="16.5" width="12" height="3" rx="1.5" fill="white"/>
+        <polyline points="13.5,22 17.5,17.5 21.5,19 25.5,13.5" fill="none" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="25.5" cy="13.5" r="2" fill="#2DD4BF"/>
+        <text x="40" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5"><tspan fill="white">Fin</tspan><tspan fill="#2DD4BF">aura</tspan></text>
+      </svg>
+    </div>
     <button class="lp-nav-cta" onclick="launchApp()">Launch App — Free</button>
   </nav>
 
@@ -130,18 +143,28 @@
 
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sidebar-logo">Fin<span>aura</span></div>
+    <div class="sidebar-logo">
+      <svg viewBox="0 0 158 34" height="30" xmlns="http://www.w3.org/2000/svg" aria-label="Finaura">
+        <rect x="0" y="1" width="32" height="32" rx="7" fill="rgba(255,255,255,0.15)"/>
+        <rect x="8" y="9" width="16" height="3" rx="1.5" fill="white"/>
+        <rect x="8" y="9" width="3" height="17" rx="1.5" fill="white"/>
+        <rect x="8" y="16.5" width="12" height="3" rx="1.5" fill="white"/>
+        <polyline points="13.5,22 17.5,17.5 21.5,19 25.5,13.5" fill="none" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="25.5" cy="13.5" r="2" fill="#2DD4BF"/>
+        <text x="40" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5"><tspan fill="white">Fin</tspan><tspan fill="#2DD4BF">aura</tspan></text>
+      </svg>
+    </div>
     <nav class="sidebar-nav">
 
       <div class="nav-group" id="navg-overview">
-        <div class="nav-section" onclick="toggleNavGroup('overview')">Overview <span class="nav-chevron">▾</span></div>
+        <div class="nav-section" onclick="toggleNavGroup('overview')">Overview <span class="nav-dot"></span></div>
         <div class="nav-group-items">
           <div class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</div>
         </div>
       </div>
 
       <div class="nav-group" id="navg-transactions">
-        <div class="nav-section" onclick="toggleNavGroup('transactions')">Transactions <span class="nav-chevron">▾</span></div>
+        <div class="nav-section" onclick="toggleNavGroup('transactions')">Transactions <span class="nav-dot"></span></div>
         <div class="nav-group-items">
           <div class="nav-item" onclick="navigate('recurring')"><span class="icon">🔁</span> Recurring</div>
           <div class="nav-item" onclick="navigate('oneoff')"><span class="icon">📋</span> One-off</div>
@@ -149,19 +172,19 @@
       </div>
 
       <div class="nav-group" id="navg-debt">
-        <div class="nav-section" onclick="toggleNavGroup('debt')">Debt <span class="nav-chevron">▾</span></div>
+        <div class="nav-section" onclick="toggleNavGroup('debt')">Debt <span class="nav-dot"></span></div>
         <div class="nav-group-items">
           <div class="nav-subgroup" id="navg-sub-creditcards">
-            <div class="nav-subsection" onclick="toggleNavSubgroup('creditcards')"><span>Credit Cards</span> <span class="nav-chevron">▾</span></div>
+            <div class="nav-subsection" onclick="toggleNavSubgroup('creditcards')"><span>Credit Cards</span> <span class="nav-dot"></span></div>
             <div class="nav-subgroup-items">
               <div class="nav-item sub" onclick="navigate('credit')"><span class="icon">💳</span> Manage Credit Cards</div>
-              <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Manage CC Transactions</div>
-              <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Manage Interest Free Periods</div>
+              <div class="nav-item sub" onclick="navigate('cctransactions')"><span class="icon">🧾</span> Manage Transactions</div>
+              <div class="nav-item sub" onclick="navigate('deals')"><span class="icon">🏷️</span> Manage 0% Periods</div>
               <div class="nav-item sub" onclick="navigate('calculators')"><span class="icon">🧮</span> Calculators</div>
             </div>
           </div>
           <div class="nav-subgroup" id="navg-sub-loans">
-            <div class="nav-subsection" onclick="toggleNavSubgroup('loans')"><span>Loans</span> <span class="nav-chevron">▾</span></div>
+            <div class="nav-subsection" onclick="toggleNavSubgroup('loans')"><span>Loans</span> <span class="nav-dot"></span></div>
             <div class="nav-subgroup-items">
               <div class="nav-item sub" onclick="navigate('loans')"><span class="icon">🏦</span> Manage Loans</div>
             </div>
@@ -170,7 +193,7 @@
       </div>
 
       <div class="nav-group" id="navg-planning">
-        <div class="nav-section" onclick="toggleNavGroup('planning')">Planning <span class="nav-chevron">▾</span></div>
+        <div class="nav-section" onclick="toggleNavGroup('planning')">Planning <span class="nav-dot"></span></div>
         <div class="nav-group-items">
           <div class="nav-item" onclick="navigate('cashflow')"><span class="icon">📈</span> Cashflow</div>
         </div>
