@@ -120,12 +120,11 @@ function buildSparkline(values, color) {
 
 function trendBadge(curr, prev, lowerIsBetter) {
   if (prev === 0 && curr === 0) return '';
-  if (prev === 0) return `<span class="dash-trend" style="color:#10B981">New this month</span>`;
+  if (prev === 0) return `<span class="dash-trend dash-trend-pos">New this month</span>`;
   const pct = Math.round(((curr - prev) / Math.abs(prev)) * 100);
   const positive = lowerIsBetter ? pct <= 0 : pct >= 0;
-  const color = positive ? '#10B981' : '#ef4444';
   const arrow = pct >= 0 ? '↑' : '↓';
-  return `<span class="dash-trend" style="color:${color}">${arrow} ${Math.abs(pct)}% vs last month</span>`;
+  return `<span class="dash-trend ${positive ? 'dash-trend-pos' : 'dash-trend-neg'}">${arrow} ${Math.abs(pct)}% vs last month</span>`;
 }
 
 // ══════════════════════════════════════════════════
@@ -314,10 +313,12 @@ function renderDashboard() {
   document.getElementById('dash-expenses').textContent       = fmt(totalExp);
   document.getElementById('dash-expenses-count').textContent = expenseData.length + ' entries';
   document.getElementById('dash-balance').textContent        = (balance<0?'-':'')+fmt(balance);
-  document.getElementById('dash-balance').style.color        = balance>=0?'#0F766E':'#ef4444';
+  document.getElementById('dash-balance').classList.toggle('value-pos', balance >= 0);
+  document.getElementById('dash-balance').classList.toggle('value-neg', balance < 0);
   const recNet = recInc - recExp;
   document.getElementById('dash-recurring-net').textContent  = (recNet<0?'-':'+')+fmt(recNet);
-  document.getElementById('dash-recurring-net').style.color  = recNet>=0?'#22c55e':'#ef4444';
+  document.getElementById('dash-recurring-net').classList.toggle('value-pos', recNet >= 0);
+  document.getElementById('dash-recurring-net').classList.toggle('value-neg', recNet < 0);
 
   const incMonths = getMonthTotals(incomeData, 6);
   const expMonths = getMonthTotals(expenseData, 6);
@@ -331,12 +332,12 @@ function renderDashboard() {
 
   const ri = [...incomeData].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-recent-income').innerHTML = ri.length
-    ? ri.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-income">${r.category}</span></td><td style="color:#16a34a;font-weight:600">${fmt(r.amount)}</td></tr>`).join('')
+    ? ri.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-income">${r.category}</span></td><td class="text-income">${fmt(r.amount)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty-state">No income yet</td></tr>';
 
   const re = [...expenseData].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-recent-expenses').innerHTML = re.length
-    ? re.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-expense">${r.category}</span></td><td style="color:#dc2626;font-weight:600">${fmt(r.amount)}</td></tr>`).join('')
+    ? re.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-expense">${r.category}</span></td><td class="text-expense">${fmt(r.amount)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty-state">No expenses yet</td></tr>';
 
   const today = new Date(); today.setHours(0,0,0,0);
@@ -355,7 +356,7 @@ function renderDashboard() {
     + upcoming.map(u => `<tr><td>${formatDate(u.date.toISOString().split('T')[0])}</td>
         <td style="font-weight:600">${u.name}</td>
         <td><span class="badge badge-${u.type}">${u.type}</span></td>
-        <td style="font-weight:600;color:${u.type==='income'?'#16a34a':'#dc2626'}">${u.type==='income'?'+':'-'}${fmt(u.amount)}</td></tr>`).join('')
+        <td class="${u.type==='income'?'text-income':'text-expense'}">${u.type==='income'?'+':'-'}${fmt(u.amount)}</td></tr>`).join('')
     + '</tbody></table></div>';
 }
 
@@ -424,16 +425,16 @@ function renderOneoffList() {
   const net = totalInc - totalExp;
   const summaryEl = document.getElementById('oneoff-summary');
   if (summaryEl) summaryEl.innerHTML =
-    `<span style="color:#16a34a">+£${totalInc.toFixed(2)}</span> &nbsp;·&nbsp; `+
-    `<span style="color:#dc2626">-£${totalExp.toFixed(2)}</span> &nbsp;·&nbsp; `+
-    `<span style="color:${net>=0?'#0F766E':'#dc2626'};font-weight:700">Net: ${fmtS(net)}</span>`;
+    `<span class="text-income">+£${totalInc.toFixed(2)}</span> &nbsp;·&nbsp; `+
+    `<span class="text-expense">-£${totalExp.toFixed(2)}</span> &nbsp;·&nbsp; `+
+    `<span class="${net>=0?'value-pos':'value-neg'}" style="font-weight:700">Net: ${fmtS(net)}</span>`;
 
   if (!rows.length) { tbody.innerHTML='<tr><td colspan="7" class="empty-state">No entries yet</td></tr>'; return; }
   tbody.innerHTML = rows.map(r => {
     const future=r.date>today, inFc=isThisMonthOrFuture(r.date);
     let actionCell;
     if (r._ccPayment) {
-      actionCell = `<td><span class="badge" style="background:#dbeafe;color:#1d4ed8;font-size:0.7rem;cursor:pointer" onclick="navigate('cctransactions')" title="Manage on CC Transactions page">💸 CC Payment</span></td>`;
+      actionCell = `<td><span class="badge badge-upcoming" style="font-size:0.7rem;cursor:pointer" onclick="navigate('cctransactions')" title="Manage on CC Transactions page">💸 CC Payment</span></td>`;
     } else {
       const delFn = r.type==='income' ? `deleteIncome(${r.id})` : `deleteExpense(${r.id})`;
       actionCell = `<td><button class="btn-sm-danger" onclick="${delFn}">Delete</button></td>`;
@@ -442,9 +443,9 @@ function renderOneoffList() {
       <td>${formatDate(r.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
       <td><span class="badge badge-${r.type}">${r.type}</span></td>
       <td>${r.category}</td>
-      <td style="color:#666">${r.description}</td>
-      <td style="font-weight:600;color:${r.type==='income'?'#16a34a':'#dc2626'}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</td>
-      <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
+      <td class="text-muted">${r.description}</td>
+      <td class="${r.type==='income'?'text-income':'text-expense'}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</td>
+      <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
       ${actionCell}</tr>`;
   }).join('');
 }
@@ -476,22 +477,22 @@ function renderRecurringTable() {
   // Build loan read-only rows
   const loanRows = loansData.map(loan => `<tr style="opacity:0.8">
     <td><span class="badge badge-expense" style="background:#1e3a5f;color:#93c5fd">🏦 Loan</span></td>
-    <td style="font-weight:600">${loan.lender}</td><td style="color:#888;font-size:0.82rem">Loan Repayment</td>
+    <td style="font-weight:600">${loan.lender}</td><td class="text-muted-sm">Loan Repayment</td>
     <td style="font-weight:600">${fmt(loan.repaymentAmount)}</td>
     <td><span class="badge badge-freq">${FREQ_LABELS[loan.frequency]||loan.frequency}</span></td>
-    <td style="color:#666">${fmt(monthlyEquiv({ amount: loan.repaymentAmount, frequency: loan.frequency }))}/mo</td>
-    <td style="color:#888;font-size:0.82rem">${formatDate(loan.startDate)}</td>
-    <td style="color:#888;font-size:0.82rem">${loan.endDate?formatDate(loan.endDate):'—'}</td>
-    <td style="color:#aaa;font-size:0.78rem;font-style:italic">Managed in Loans</td></tr>`);
+    <td class="text-muted">${fmt(monthlyEquiv({ amount: loan.repaymentAmount, frequency: loan.frequency }))}/mo</td>
+    <td class="text-muted-sm">${formatDate(loan.startDate)}</td>
+    <td class="text-muted-sm">${loan.endDate?formatDate(loan.endDate):'—'}</td>
+    <td class="text-muted-sm" style="font-style:italic">Managed in Loans</td></tr>`);
   if (!recurringData.length && !loanRows.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-state">No recurring transactions yet</td></tr>'; return; }
   tbody.innerHTML=recurringData.map(r=>`<tr>
     <td><span class="badge badge-${r.type}">${r.type}</span></td>
     <td style="font-weight:600">${r.name}</td><td>${r.category}</td>
     <td style="font-weight:600">${fmt(r.amount)}</td>
     <td><span class="badge badge-freq">${FREQ_LABELS[r.frequency]}</span></td>
-    <td style="color:#666">${fmt(monthlyEquiv(r))}/mo</td>
-    <td style="color:#888;font-size:0.82rem">${formatDate(r.startDate)}</td>
-    <td style="color:#888;font-size:0.82rem">${r.endDate?formatDate(r.endDate):'—'}</td>
+    <td class="text-muted">${fmt(monthlyEquiv(r))}/mo</td>
+    <td class="text-muted-sm">${formatDate(r.startDate)}</td>
+    <td class="text-muted-sm">${r.endDate?formatDate(r.endDate):'—'}</td>
     <td><button class="btn-sm-danger" onclick="deleteRecurring(${r.id})">Delete</button></td></tr>`).join('') + loanRows.join('');
 }
 function renderUpcomingTimeline() {
@@ -538,18 +539,18 @@ function renderCashflow() {
   document.getElementById('cf-cc-debt').textContent          =fmt(totalDebt);
   document.getElementById('cf-cc-count').textContent         =creditCards.length+' card'+(creditCards.length!==1?'s':'');
   document.getElementById('cf-next-month-net').textContent   =(nextNet<0?'-':'+')+fmt(nextNet);
-  document.getElementById('cf-next-month-net').style.color   =nextNet>=0?'#22c55e':'#ef4444';
+  document.getElementById('cf-next-month-net').classList.toggle('value-pos', nextNet >= 0);
+  document.getElementById('cf-next-month-net').classList.toggle('value-neg', nextNet < 0);
 
   // Bar chart
   const maxAbs=Math.max(...rows.map(r=>Math.abs(r.net)),1);
   document.getElementById('cf-bar-chart').innerHTML=rows.map(r=>{
     const pct=Math.min((Math.abs(r.net)/maxAbs)*100,100), pos=r.net>=0;
-    const col=pos?'#22c55e':'#ef4444';
     const hasOneOff=r.oneOffInc>0||r.oneOffExp>0;
     return `<div class="bar-row" style="${r.isPast?'opacity:0.5':''}">
       <div class="bar-label">${formatMonthYear(r.yr,r.mo)}</div>
       <div class="bar-track"><div class="bar-fill ${pos?'pos':'neg'}" style="width:${pct}%"></div></div>
-      <div class="bar-value" style="color:${col}">${pos?'+':'-'}${fmt(r.net)}${hasOneOff?'<span class="cf-oneoff-dot" title="Includes one-off entries"></span>':''}</div>
+      <div class="bar-value ${pos?'value-pos':'value-neg'}">${pos?'+':'-'}${fmt(r.net)}${hasOneOff?'<span class="cf-oneoff-dot" title="Includes one-off entries"></span>':''}</div>
     </div>`;
   }).join('')||'<div class="empty-state">Add recurring transactions to see projections</div>';
 
@@ -565,11 +566,11 @@ function renderCashflow() {
     const ccHas0=r.ccPayments.some(p=>p.interestFree&&p.payment>0);
     return `<tr class="${r.isPast?'cf-past':''}">
       <td>${formatMonthYear(r.yr,r.mo)}</td>
-      <td title="${incTip}" style="color:#16a34a;cursor:${r.recInc?'help':'default'}">${r.recInc>0?fmt(r.recInc):'—'}</td>
-      <td title="${r.oneOffIncItems.map(i=>'📌 '+i.name+': '+fmt(i.amount)).join('\n')}" style="color:#16a34a;cursor:${r.oneOffIncItems.length?'help':'default'}">${r.oneOffInc>0?fmt(r.oneOffInc):'—'}</td>
-      <td title="${expTip}" style="color:#dc2626;cursor:${r.recExp?'help':'default'}">${r.recExp>0?fmt(r.recExp):'—'}</td>
-      <td title="${r.oneOffExpItems.map(i=>'📌 '+i.name+': '+fmt(i.amount)).join('\n')}" style="color:#dc2626;cursor:${r.oneOffExpItems.length?'help':'default'}">${r.oneOffExp>0?fmt(r.oneOffExp):'—'}</td>
-      <td title="${ccTip}" style="color:#7c3aed;cursor:${ccTip?'help':'default'}">${r.ccTotal>0?fmt(r.ccTotal)+(ccHas0?' <span class="zero-pct-tag">0%</span>':''):'—'}</td>
+      <td title="${incTip}" class="text-income" style="cursor:${r.recInc?'help':'default'}">${r.recInc>0?fmt(r.recInc):'—'}</td>
+      <td title="${r.oneOffIncItems.map(i=>'📌 '+i.name+': '+fmt(i.amount)).join('\n')}" class="text-income" style="cursor:${r.oneOffIncItems.length?'help':'default'}">${r.oneOffInc>0?fmt(r.oneOffInc):'—'}</td>
+      <td title="${expTip}" class="text-expense" style="cursor:${r.recExp?'help':'default'}">${r.recExp>0?fmt(r.recExp):'—'}</td>
+      <td title="${r.oneOffExpItems.map(i=>'📌 '+i.name+': '+fmt(i.amount)).join('\n')}" class="text-expense" style="cursor:${r.oneOffExpItems.length?'help':'default'}">${r.oneOffExp>0?fmt(r.oneOffExp):'—'}</td>
+      <td title="${ccTip}" class="text-cc" style="cursor:${ccTip?'help':'default'}">${r.ccTotal>0?fmt(r.ccTotal)+(ccHas0?' <span class="zero-pct-tag">0%</span>':''):'—'}</td>
       <td class="${nc}">${fmtS(r.net)}</td>
       <td class="${rc}">${fmtS(running)}</td>
     </tr>`;
@@ -585,9 +586,9 @@ function renderCashflow() {
       +creditCards.map(card=>{
         const snap=r.cardSnapshot.find(s=>s.id===card.id);
         const bal=snap?snap.balance:0;
-        if (bal<=0.005) return '<td style="color:#16a34a;font-weight:600">✓ Paid off</td>';
+        if (bal<=0.005) return '<td class="text-paid-off">✓ Paid off</td>';
         const dealActive=snap?snap.hasActiveDeal:false;
-        return `<td style="color:${dealActive?'#065f46':'#dc2626'};font-weight:600">${fmt(bal)}${dealActive?' <span class="zero-pct-tag">0%</span>':''}</td>`;
+        return `<td class="${dealActive?'text-deal-active':'text-expense'}">${fmt(bal)}${dealActive?' <span class="zero-pct-tag">0%</span>':''}</td>`;
       }).join('')+'</tr>').join('')+'</tbody>';
 }
 
@@ -680,7 +681,7 @@ function renderCardList() {
       </div>
       <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
         <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Balance</div><div class="card-balance">${fmt(c.balance)}</div></div>
-        <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Next min payment</div><div style="font-weight:700;color:#7c3aed">${fmt(minPay)}</div></div>
+        <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Next min payment</div><div class="text-cc" style="font-weight:700">${fmt(minPay)}</div></div>
         <div style="display:flex;gap:8px">
           <button class="btn-sm-ghost" onclick="editCard(${c.id})">Edit</button>
           <button class="btn-sm-danger" onclick="deleteCard(${c.id})">Delete</button>
@@ -766,7 +767,7 @@ function renderDealsPage() {
         <div class="deal-card-name">💳 ${ccName}</div>
         <div class="deal-meta">
           ${badge}
-          ${d.note ? `<span style="color:#888">${d.note}</span>` : ''}
+          ${d.note ? `<span class="text-muted">${d.note}</span>` : ''}
         </div>
         <div class="deal-meta" style="margin-top:6px">
           <span>📅 ${formatDate(d.startDate)} → ${formatDate(d.endDate)}</span>
@@ -897,10 +898,10 @@ function renderLoansPage() {
       <td>${fmt(l.totalAmount)}</td>
       <td style="font-weight:600">${fmt(l.repaymentAmount)}</td>
       <td><span class="badge badge-freq">${FREQ_LABELS[l.frequency] || l.frequency}</span></td>
-      <td style="color:#888">${l.apr ? l.apr + '%' : '—'}</td>
-      <td style="color:#888;font-size:0.82rem">${formatDate(l.startDate)}</td>
-      <td style="color:#888;font-size:0.82rem">${l.endDate ? formatDate(l.endDate) : '—'}</td>
-      <td style="color:#888;font-size:0.82rem">${l.note || '—'}</td>
+      <td class="text-muted">${l.apr ? l.apr + '%' : '—'}</td>
+      <td class="text-muted-sm">${formatDate(l.startDate)}</td>
+      <td class="text-muted-sm">${l.endDate ? formatDate(l.endDate) : '—'}</td>
+      <td class="text-muted-sm">${l.note || '—'}</td>
       <td style="white-space:nowrap">
         <button class="btn-sm" onclick="editLoan(${l.id})" style="margin-right:4px">Edit</button>
         <button class="btn-sm-danger" onclick="deleteLoan(${l.id})">Delete</button>
@@ -1001,17 +1002,17 @@ function runPayoffSim(balance, apr, getPayment) {
   return{months,totalInterest:ti,totalPaid:tp,schedule:sched};
 }
 function payoffResultHtml(r, balance) {
-  if(r.error) return `<div class="result-box"><h3>⚠️ Payment too low</h3><p style="font-size:0.85rem;color:#7c3aed">Payment doesn't cover monthly interest. Debt will never reduce.</p></div>`;
+  if(r.error) return `<div class="result-box"><h3>⚠️ Payment too low</h3><p class="text-cc" style="font-size:0.85rem">Payment doesn't cover monthly interest. Debt will never reduce.</p></div>`;
   const y=Math.floor(r.months/12),m=r.months%12,ts=y>0?`${y}yr ${m>0?m+'mo':''}`.trim():`${m} months`;
   return `<div class="result-box"><h3>📊 Payoff Summary</h3>
     <div class="result-row"><span>Time to pay off</span><span class="val">${r.months>=600?'50+ years!':ts}</span></div>
     <div class="result-row"><span>Total paid</span><span class="val">${fmt(r.totalPaid)}</span></div>
-    <div class="result-row"><span>Total interest</span><span class="val" style="color:#dc2626">${fmt(r.totalInterest)}</span></div>
+    <div class="result-row"><span>Total interest</span><span class="val value-neg">${fmt(r.totalInterest)}</span></div>
     <div class="result-row"><span>Interest as % of balance</span><span class="val">${((r.totalInterest/balance)*100).toFixed(1)}%</span></div>
   </div>
   <div class="payoff-table"><p style="font-size:0.75rem;color:#aaa;margin:10px 0 5px">First ${r.schedule.length} months</p>
     <table><thead><tr><th>Month</th><th>Interest</th><th>Payment</th><th>Balance</th></tr></thead>
-    <tbody>${r.schedule.map(s=>`<tr><td>${s.month}</td><td style="color:#dc2626">£${s.interest.toFixed(2)}</td><td style="color:#16a34a">£${s.payment.toFixed(2)}</td><td style="font-weight:600">£${s.balance.toFixed(2)}</td></tr>`).join('')}
+    <tbody>${r.schedule.map(s=>`<tr><td>${s.month}</td><td class="value-neg">£${s.interest.toFixed(2)}</td><td class="value-pos">£${s.payment.toFixed(2)}</td><td style="font-weight:600">£${s.balance.toFixed(2)}</td></tr>`).join('')}
     </tbody></table></div>`;
 }
 function calcMinPayment() {
@@ -1033,7 +1034,7 @@ function calcInterestComparison() {
   const rows=pmts.map(p=>{const res=runPayoffSim(b,r,()=>p);const y=Math.floor(res.months/12),m=res.months%12;return{p,months:res.months,interest:res.totalInterest,time:y>0?`${y}y ${m>0?m+'m':''}`.trim():`${m}m`};});
   document.getElementById('ic-result').innerHTML=`<div style="margin-top:16px;overflow-x:auto"><table>
     <thead><tr><th>Monthly Payment</th><th>Time</th><th>Total Interest</th><th>Total Cost</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr style="${i===rows.length-1?'background:#f0fdf4':''}"><td style="font-weight:600">${fmt(r.p)}</td><td>${r.time}</td><td style="color:#dc2626">${fmt(r.interest)}</td><td style="font-weight:600">${fmt(b+r.interest)}</td></tr>`).join('')}</tbody>
+    <tbody>${rows.map((r,i)=>`<tr style="${i===rows.length-1?'background:#f0fdf4':''}"><td style="font-weight:600">${fmt(r.p)}</td><td>${r.time}</td><td class="value-neg">${fmt(r.interest)}</td><td style="font-weight:600">${fmt(b+r.interest)}</td></tr>`).join('')}</tbody>
   </table><p style="font-size:0.75rem;color:#aaa;margin-top:8px">Balance: ${fmt(b)} · Rate: ${r}% APR · Monthly interest: ${fmt(mi)}</p></div>`;
 }
 
@@ -1151,8 +1152,8 @@ function renderCCTransactions() {
   const summaryEl = document.getElementById('cct-summary');
   if (summaryEl) {
     const parts = [];
-    if (charges.length)  parts.push(`<span style="color:#7c3aed">${charges.length} charge${charges.length!==1?'s':''}: ${fmt(totalCharged)}</span>`);
-    if (payments.length) parts.push(`<span style="color:#16a34a">${payments.length} payment${payments.length!==1?'s':''}: ${fmt(totalPaid)}</span>`);
+    if (charges.length)  parts.push(`<span class="text-cc">${charges.length} charge${charges.length!==1?'s':''}: ${fmt(totalCharged)}</span>`);
+    if (payments.length) parts.push(`<span class="text-income">${payments.length} payment${payments.length!==1?'s':''}: ${fmt(totalPaid)}</span>`);
     summaryEl.innerHTML = parts.join(' &nbsp;·&nbsp; ');
   }
 
@@ -1176,10 +1177,10 @@ function renderCCTransactions() {
         <td><input class="cct-edit-input" data-field="date" type="date" value="${t.date}" style="width:130px"/></td>
         <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
         <td><select class="cct-edit-input" data-field="card" style="width:140px">${cardOpts(t.cardId)}</select></td>
-        <td>${isPayment ? '<span style="color:#aaa;font-size:0.82rem">—</span>' : `<select class="cct-edit-input" data-field="cat" style="width:130px">${catOpts(t.category)}</select>`}</td>
+        <td>${isPayment ? '<span class="text-muted-sm">—</span>' : `<select class="cct-edit-input" data-field="cat" style="width:130px">${catOpts(t.category)}</select>`}</td>
         <td><input class="cct-edit-input" data-field="desc" type="text" value="${t.description}" placeholder="Description"/></td>
         <td><input class="cct-edit-input" data-field="amount" type="number" value="${t.amount}" min="0.01" step="0.01" style="width:90px"/></td>
-        <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
+        <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn-sm-ghost" onclick="saveCCTEdit(${t.id})">Save</button>
           <button class="btn-sm-ghost" onclick="cancelCCTEdit()" style="margin-left:4px">Cancel</button>
@@ -1191,10 +1192,10 @@ function renderCCTransactions() {
       <td>${formatDate(t.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
       <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
       <td><span class="badge badge-card">💳 ${cardName}</span></td>
-      <td style="color:#666">${isPayment ? '<span style="color:#aaa">—</span>' : t.category}</td>
-      <td style="color:#666">${t.description}</td>
-      <td style="font-weight:600;color:${isPayment?'#16a34a':'#7c3aed'}">${isPayment?'-':'-'}${fmt(t.amount)}</td>
-      <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span style="color:#ccc;font-size:0.8rem">Historical</span>'}</td>
+      <td class="text-muted">${isPayment ? '—' : t.category}</td>
+      <td class="text-muted">${t.description}</td>
+      <td class="${isPayment?'text-income':'text-cc'}">${isPayment?'-':'-'}${fmt(t.amount)}</td>
+      <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn-sm-ghost" onclick="editCCTransaction(${t.id})" style="margin-right:4px">Edit</button>
         <button class="btn-sm-danger" onclick="deleteCCTransaction(${t.id})">Delete</button>
