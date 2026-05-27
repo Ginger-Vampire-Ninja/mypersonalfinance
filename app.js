@@ -1252,6 +1252,31 @@ function restoreNavState() {
 }
 
 // ══════════════════════════════════════════════════
+//  DARK MODE
+// ══════════════════════════════════════════════════
+function toggleDarkMode() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const next   = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('mf_dark_mode', next);
+  if (window.posthog) posthog.capture('dark_mode_toggled', { theme: next });
+  const icon  = document.getElementById('dark-toggle-icon');
+  const label = document.getElementById('dark-toggle-label');
+  if (icon)  icon.textContent  = next === 'dark' ? '☀️' : '🌙';
+  if (label) label.textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
+}
+
+function restoreDarkMode() {
+  if (localStorage.getItem('mf_dark_mode') === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    const icon  = document.getElementById('dark-toggle-icon');
+    const label = document.getElementById('dark-toggle-label');
+    if (icon)  icon.textContent  = '☀️';
+    if (label) label.textContent = 'Light mode';
+  }
+}
+
+// ══════════════════════════════════════════════════
 //  LANDING PAGE
 // ══════════════════════════════════════════════════
 function launchApp() {
@@ -1274,6 +1299,7 @@ function checkFirstVisit() {
 // ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
+restoreDarkMode();
 checkFirstVisit();
 restoreSidebarState();
 restoreNavState();
