@@ -210,7 +210,12 @@
       </div>
 
     </nav>
-    <div class="sidebar-footer">Data saved locally in your browser<br>© 2025 Finaura · <a href="legal.html" style="color:#555;text-decoration:underline;">Terms &amp; Privacy</a></div>
+    <div class="sidebar-footer">
+      <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">
+        <span id="dark-toggle-icon">🌙</span> <span id="dark-toggle-label">Dark mode</span>
+      </button>
+      <div style="margin-top:10px">Data saved locally in your browser<br>© 2025 Finaura · <a href="legal.html" class="footer-link">Terms &amp; Privacy</a></div>
+    </div>
   </aside>
 
   <main class="main">
@@ -542,9 +547,9 @@
       </div>
 
       <!-- How it works -->
-      <div class="panel" style="background:#f8f9fb;box-shadow:none;border:1.5px solid #e5e7eb">
-        <div class="panel-title" style="color:#555">ℹ️ How interest-free deals work in your forecast</div>
-        <p style="font-size:0.85rem;color:#666;line-height:1.6">
+      <div class="panel panel-info">
+        <div class="panel-title panel-info-title">ℹ️ How interest-free deals work in your forecast</div>
+        <p class="panel-info-body">
           During the deal period, interest is only charged on any card balance <em>above</em> the interest-free amount. For example, if your deal covers £2,000 and your card balance is £2,400, interest is only charged on £400. If the balance is at or below £2,000, no interest is charged at all.<br/><br/>
           When the deal end date passes, your full card balance reverts to the standard APR. If you have multiple active deals on the same card, the amounts are combined.
         </p>
