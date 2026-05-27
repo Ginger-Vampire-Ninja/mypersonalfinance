@@ -223,3 +223,27 @@ tr:hover td { background: #fafafa; }
 .card-kpi-row { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 4px; }
 .card-kpi-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
 .dash-trend { font-size: 0.72rem; font-weight: 600; }
+
+/* Semantic colour utilities — used by JS template strings so dark mode can override them */
+.text-income      { color: #16a34a; font-weight: 600; }
+.text-expense     { color: #dc2626; font-weight: 600; }
+.text-muted       { color: #888; }
+.text-muted-sm    { color: #888; font-size: 0.82rem; }
+.text-cc          { color: #7c3aed; }
+.value-pos        { color: #0F766E; }
+.value-neg        { color: #dc2626; }
+.text-paid-off    { color: #16a34a; font-weight: 600; }
+.text-deal-active { color: #065f46; font-weight: 600; }
+.dash-trend-pos   { color: #10B981; }
+.dash-trend-neg   { color: #ef4444; }
+html[data-theme="dark"] .text-income      { color: #10B981; }
+html[data-theme="dark"] .text-expense     { color: #f87171; }
+html[data-theme="dark"] .text-muted       { color: #64748b; }
+html[data-theme="dark"] .text-muted-sm    { color: #64748b; }
+html[data-theme="dark"] .text-cc          { color: #a78bfa; }
+html[data-theme="dark"] .value-pos        { color: #2DD4BF; }
+html[data-theme="dark"] .value-neg        { color: #f87171; }
+html[data-theme="dark"] .text-paid-off    { color: #34D399; }
+html[data-theme="dark"] .text-deal-active { color: #34D399; }
+html[data-theme="dark"] .dash-trend-pos   { color: #10B981; }
+html[data-theme="dark"] .dash-trend-neg   { color: #f87171; }
