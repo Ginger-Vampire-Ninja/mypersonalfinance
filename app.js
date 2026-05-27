@@ -1010,7 +1010,7 @@ function payoffResultHtml(r, balance) {
     <div class="result-row"><span>Total interest</span><span class="val value-neg">${fmt(r.totalInterest)}</span></div>
     <div class="result-row"><span>Interest as % of balance</span><span class="val">${((r.totalInterest/balance)*100).toFixed(1)}%</span></div>
   </div>
-  <div class="payoff-table"><p style="font-size:0.75rem;color:#aaa;margin:10px 0 5px">First ${r.schedule.length} months</p>
+  <div class="payoff-table"><p class="text-muted-sm" style="margin:10px 0 5px">First ${r.schedule.length} months</p>
     <table><thead><tr><th>Month</th><th>Interest</th><th>Payment</th><th>Balance</th></tr></thead>
     <tbody>${r.schedule.map(s=>`<tr><td>${s.month}</td><td class="value-neg">£${s.interest.toFixed(2)}</td><td class="value-pos">£${s.payment.toFixed(2)}</td><td style="font-weight:600">£${s.balance.toFixed(2)}</td></tr>`).join('')}
     </tbody></table></div>`;
