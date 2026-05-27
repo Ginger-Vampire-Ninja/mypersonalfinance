@@ -356,7 +356,7 @@ function renderDashboard() {
     + upcoming.map(u => `<tr><td>${formatDate(u.date.toISOString().split('T')[0])}</td>
         <td style="font-weight:600">${u.name}</td>
         <td><span class="badge badge-${u.type}">${u.type}</span></td>
-        <td style="font-weight:600;color:${u.type==='income'?'#16a34a':'#dc2626'}">${u.type==='income'?'+':'-'}${fmt(u.amount)}</td></tr>`).join('')
+        <td class="${u.type==='income'?'text-income':'text-expense'}">${u.type==='income'?'+':'-'}${fmt(u.amount)}</td></tr>`).join('')
     + '</tbody></table></div>';
 }
 
@@ -681,7 +681,7 @@ function renderCardList() {
       </div>
       <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
         <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Balance</div><div class="card-balance">${fmt(c.balance)}</div></div>
-        <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Next min payment</div><div style="font-weight:700;color:#7c3aed">${fmt(minPay)}</div></div>
+        <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Next min payment</div><div class="text-cc" style="font-weight:700">${fmt(minPay)}</div></div>
         <div style="display:flex;gap:8px">
           <button class="btn-sm-ghost" onclick="editCard(${c.id})">Edit</button>
           <button class="btn-sm-danger" onclick="deleteCard(${c.id})">Delete</button>
@@ -1002,17 +1002,17 @@ function runPayoffSim(balance, apr, getPayment) {
   return{months,totalInterest:ti,totalPaid:tp,schedule:sched};
 }
 function payoffResultHtml(r, balance) {
-  if(r.error) return `<div class="result-box"><h3>⚠️ Payment too low</h3><p style="font-size:0.85rem;color:#7c3aed">Payment doesn't cover monthly interest. Debt will never reduce.</p></div>`;
+  if(r.error) return `<div class="result-box"><h3>⚠️ Payment too low</h3><p class="text-cc" style="font-size:0.85rem">Payment doesn't cover monthly interest. Debt will never reduce.</p></div>`;
   const y=Math.floor(r.months/12),m=r.months%12,ts=y>0?`${y}yr ${m>0?m+'mo':''}`.trim():`${m} months`;
   return `<div class="result-box"><h3>📊 Payoff Summary</h3>
     <div class="result-row"><span>Time to pay off</span><span class="val">${r.months>=600?'50+ years!':ts}</span></div>
     <div class="result-row"><span>Total paid</span><span class="val">${fmt(r.totalPaid)}</span></div>
-    <div class="result-row"><span>Total interest</span><span class="val text-expense">${fmt(r.totalInterest)}</span></div>
+    <div class="result-row"><span>Total interest</span><span class="val value-neg">${fmt(r.totalInterest)}</span></div>
     <div class="result-row"><span>Interest as % of balance</span><span class="val">${((r.totalInterest/balance)*100).toFixed(1)}%</span></div>
   </div>
   <div class="payoff-table"><p class="text-muted-sm" style="margin:10px 0 5px">First ${r.schedule.length} months</p>
     <table><thead><tr><th>Month</th><th>Interest</th><th>Payment</th><th>Balance</th></tr></thead>
-    <tbody>${r.schedule.map(s=>`<tr><td>${s.month}</td><td class="text-expense">£${s.interest.toFixed(2)}</td><td class="text-income">£${s.payment.toFixed(2)}</td><td style="font-weight:600">£${s.balance.toFixed(2)}</td></tr>`).join('')}
+    <tbody>${r.schedule.map(s=>`<tr><td>${s.month}</td><td class="value-neg">£${s.interest.toFixed(2)}</td><td class="value-pos">£${s.payment.toFixed(2)}</td><td style="font-weight:600">£${s.balance.toFixed(2)}</td></tr>`).join('')}
     </tbody></table></div>`;
 }
 function calcMinPayment() {
@@ -1034,8 +1034,8 @@ function calcInterestComparison() {
   const rows=pmts.map(p=>{const res=runPayoffSim(b,r,()=>p);const y=Math.floor(res.months/12),m=res.months%12;return{p,months:res.months,interest:res.totalInterest,time:y>0?`${y}y ${m>0?m+'m':''}`.trim():`${m}m`};});
   document.getElementById('ic-result').innerHTML=`<div style="margin-top:16px;overflow-x:auto"><table>
     <thead><tr><th>Monthly Payment</th><th>Time</th><th>Total Interest</th><th>Total Cost</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr style="${i===rows.length-1?'background:#f0fdf4':''}"><td style="font-weight:600">${fmt(r.p)}</td><td>${r.time}</td><td class="text-expense">${fmt(r.interest)}</td><td style="font-weight:600">${fmt(b+r.interest)}</td></tr>`).join('')}</tbody>
-  </table><p class="text-muted-sm" style="margin-top:8px">Balance: ${fmt(b)} · Rate: ${r}% APR · Monthly interest: ${fmt(mi)}</p></div>`;
+    <tbody>${rows.map((r,i)=>`<tr style="${i===rows.length-1?'background:#f0fdf4':''}"><td style="font-weight:600">${fmt(r.p)}</td><td>${r.time}</td><td class="value-neg">${fmt(r.interest)}</td><td style="font-weight:600">${fmt(b+r.interest)}</td></tr>`).join('')}</tbody>
+  </table><p style="font-size:0.75rem;color:#aaa;margin-top:8px">Balance: ${fmt(b)} · Rate: ${r}% APR · Monthly interest: ${fmt(mi)}</p></div>`;
 }
 
 // ══════════════════════════════════════════════════
@@ -1192,9 +1192,9 @@ function renderCCTransactions() {
       <td>${formatDate(t.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
       <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
       <td><span class="badge badge-card">💳 ${cardName}</span></td>
-      <td class="text-muted">${isPayment ? '<span class="text-muted">—</span>' : t.category}</td>
+      <td class="text-muted">${isPayment ? '—' : t.category}</td>
       <td class="text-muted">${t.description}</td>
-      <td style="font-weight:600" class="${isPayment?'text-income':'text-cc'}">${isPayment?'-':'-'}${fmt(t.amount)}</td>
+      <td class="${isPayment?'text-income':'text-cc'}">${isPayment?'-':'-'}${fmt(t.amount)}</td>
       <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn-sm-ghost" onclick="editCCTransaction(${t.id})" style="margin-right:4px">Edit</button>
