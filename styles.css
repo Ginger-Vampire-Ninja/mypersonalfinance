@@ -311,3 +311,49 @@ html[data-theme="dark"] .text-paid-off    { color: #34D399; }
 html[data-theme="dark"] .text-deal-active { color: #34D399; }
 html[data-theme="dark"] .dash-trend-pos   { color: #10B981; }
 html[data-theme="dark"] .dash-trend-neg   { color: #f87171; }
+
+/* ══════════════════════════════════════════════════
+   AUTH — Google sign-in, user info, migration banner
+══════════════════════════════════════════════════ */
+
+/* Google sign-in button */
+.btn-google-signin {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fff; color: #3c4043; border: 1.5px solid #dadce0;
+  border-radius: 8px; padding: 11px 20px; font-size: 0.95rem; font-weight: 500;
+  cursor: pointer; width: 100%; transition: box-shadow 0.15s, background 0.15s;
+}
+.btn-google-signin:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); background: #f8f9fa; }
+
+/* Auth box on landing page */
+.lp-auth-box {
+  background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px;
+  padding: 28px; max-width: 380px; margin: 0 auto 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.lp-auth-divider {
+  text-align: center; color: #9ca3af; font-size: 0.82rem; margin: 14px 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.lp-auth-divider::before, .lp-auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: #e5e7eb;
+}
+.lp-auth-note { font-size: 0.78rem; color: #9ca3af; text-align: center; margin-top: 12px; }
+.lp-auth-box .lp-btn-secondary { width: 100%; text-align: center; }
+
+/* User info in sidebar footer */
+.user-info { margin-bottom: 10px; }
+.user-profile { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.user-avatar { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); }
+.user-avatar-placeholder { font-size: 1.2rem; }
+.user-name { font-size: 0.82rem; color: rgba(255,255,255,0.9); font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-sign-out { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); border-radius: 5px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; width: 100%; transition: background 0.15s; }
+.btn-sign-out:hover { background: rgba(255,255,255,0.2); }
+
+/* Migration banner */
+.migration-banner {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px;
+  padding: 12px 18px; margin-bottom: 20px; font-size: 0.88rem; color: #1e40af;
+}
+html[data-theme="dark"] .migration-banner { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
