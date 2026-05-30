@@ -43,19 +43,14 @@ let currentUser = null;
 // ── Field mapping (camelCase JS ↔ snake_case DB) ──
 function toDbIncome(r)      { return { id: r.id, date: r.date, category: r.category, amount: r.amount, description: r.description || null }; }
 function fromDbIncome(r)    { return { id: r.id, date: r.date, category: r.category, amount: parseFloat(r.amount), description: r.description }; }
-
 function toDbRecurring(r)   { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: r.amount, frequency: r.frequency, start_date: r.startDate, end_date: r.endDate || null }; }
 function fromDbRecurring(r) { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: parseFloat(r.amount), frequency: r.frequency, startDate: r.start_date, endDate: r.end_date }; }
-
 function toDbCard(c)        { return { id: c.id, name: c.name, balance: c.balance, apr: c.apr, min_type: c.minType, min_pct: c.minPct || null, min_floor: c.minFloor || null, min_fixed: c.minFixed || null }; }
 function fromDbCard(c)      { return { id: c.id, name: c.name, balance: parseFloat(c.balance), apr: parseFloat(c.apr), minType: c.min_type, minPct: c.min_pct ? parseFloat(c.min_pct) : null, minFloor: c.min_floor ? parseFloat(c.min_floor) : null, minFixed: c.min_fixed ? parseFloat(c.min_fixed) : null }; }
-
 function toDbDeal(d)        { return { id: d.id, card_id: d.cardId, amount: d.amount, start_date: d.startDate, end_date: d.endDate, note: d.note || null }; }
 function fromDbDeal(d)      { return { id: d.id, cardId: d.card_id, amount: parseFloat(d.amount), startDate: d.start_date, endDate: d.end_date, note: d.note }; }
-
 function toDbCCT(t)         { return { id: t.id, card_id: t.cardId, date: t.date, amount: t.amount, category: t.category, description: t.description || null, type: t.type }; }
 function fromDbCCT(t)       { return { id: t.id, cardId: t.card_id, date: t.date, amount: parseFloat(t.amount), category: t.category, description: t.description, type: t.type || 'charge' }; }
-
 function toDbLoan(l)        { return { id: l.id, lender: l.lender, total_amount: l.totalAmount, repayment_amount: l.repaymentAmount, apr: l.apr || null, frequency: l.frequency, start_date: l.startDate, end_date: l.endDate || null, note: l.note || null }; }
 function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: parseFloat(l.totalAmount), repaymentAmount: parseFloat(l.repaymentAmount), apr: l.apr ? parseFloat(l.apr) : null, frequency: l.frequency, startDate: l.start_date, endDate: l.end_date, note: l.note }; }
 
@@ -100,24 +95,56 @@ async function signInWithGoogle() {
   });
   if (error) toast('⚠️ Sign in failed: ' + error.message);
 }
-
 async function signOut() {
+  document.getElementById('account-menu-dropdown')?.classList.remove('open');
   await db.auth.signOut();
 }
 
+// ── Account menu UI ──
 function updateUserUI() {
-  const el = document.getElementById('user-info');
-  if (!el) return;
+  const menuEl = document.getElementById('account-menu');
+  if (!menuEl) return;
   if (currentUser) {
-    const name   = currentUser.user_metadata?.full_name || currentUser.email || 'User';
-    const avatar = currentUser.user_metadata?.avatar_url;
-    el.innerHTML = `<div class="user-profile">
-      ${avatar ? `<img class="user-avatar" src="${avatar}" alt=""/>` : '<span class="user-avatar-placeholder">👤</span>'}
-      <span class="user-name" title="${currentUser.email}">${name}</span>
-    </div>
-    <button class="btn-sign-out" onclick="signOut()">Sign out</button>`;
+    const name    = currentUser.user_metadata?.full_name || currentUser.email || 'Account';
+    const email   = currentUser.email || '';
+    const avatar  = currentUser.user_metadata?.avatar_url;
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const shortName = name.split(' ')[0];
+    menuEl.style.display = 'block';
+    const avatarEl = document.getElementById('account-menu-avatar-placeholder');
+    if (avatar && avatarEl) {
+      avatarEl.outerHTML = `<img class="account-menu-avatar" id="account-menu-avatar-placeholder" src="${avatar}" alt=""/>`;
+    } else if (avatarEl) {
+      avatarEl.textContent = initials;
+    }
+    const nameEl = document.getElementById('account-menu-name');
+    if (nameEl) nameEl.textContent = shortName;
+    const ddName  = document.getElementById('account-dropdown-name');
+    const ddEmail = document.getElementById('account-dropdown-email');
+    if (ddName)  ddName.textContent  = name;
+    if (ddEmail) ddEmail.textContent = email;
+    // Sidebar note
+    const sidebarInfo = document.getElementById('user-info');
+    if (sidebarInfo) sidebarInfo.innerHTML = `<div class="user-profile"><span>✓</span><span>${shortName}</span></div>`;
   } else {
-    el.innerHTML = '';
+    menuEl.style.display = 'none';
+    const sidebarInfo = document.getElementById('user-info');
+    if (sidebarInfo) sidebarInfo.innerHTML = '';
+  }
+}
+
+function toggleAccountMenu() {
+  const dropdown = document.getElementById('account-menu-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.toggle('open');
+  if (dropdown.classList.contains('open')) {
+    setTimeout(() => document.addEventListener('click', _closeAccountMenu, { once: true }), 0);
+  }
+}
+function _closeAccountMenu(e) {
+  const menu = document.getElementById('account-menu');
+  if (menu && !menu.contains(e.target)) {
+    document.getElementById('account-menu-dropdown')?.classList.remove('open');
   }
 }
 
@@ -144,7 +171,6 @@ async function migrateFromLocalStorage() {
     const lsDeals     = JSON.parse(localStorage.getItem('mf_deals')           || '[]');
     const lsCCT       = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]');
     const lsLoans     = JSON.parse(localStorage.getItem('mf_loans')           || '[]');
-    // Cards first — deals and cct reference them via FK
     if (lsCards.length)     await db.from('credit_cards').upsert(lsCards.map(c => ({ ...toDbCard(c), user_id: uid })));
     if (lsIncome.length)    await db.from('income').upsert(lsIncome.map(r => ({ ...toDbIncome(r), user_id: uid })));
     if (lsExpenses.length)  await db.from('expenses').upsert(lsExpenses.map(r => ({ ...toDbIncome(r), user_id: uid })));
@@ -601,8 +627,7 @@ function addRecurring() {
   if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
   if (!start) { toast('⚠️ Pick a start date'); return; }
   const rec = { id:Date.now(), type:currentRecType, name, category:cat, amount:amt, frequency:freq, startDate:start, endDate:end||null };
-  recurringData.push(rec);
-  dbUpsert('recurring', rec, toDbRecurring);
+  recurringData.push(rec); dbUpsert('recurring', rec, toDbRecurring);
   saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('✅ Recurring transaction added!');
   if (window.posthog) posthog.capture('recurring_added', { type: currentRecType, frequency: freq, category: cat });
   document.getElementById('rec-name').value=''; document.getElementById('rec-amount').value=''; document.getElementById('rec-end').value='';
@@ -1074,8 +1099,7 @@ function saveLoan() {
   } else {
     const id = Date.now();
     const loan = { id, lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note };
-    loansData.push(loan);
-    dbUpsert('loans', loan, toDbLoan);
+    loansData.push(loan); dbUpsert('loans', loan, toDbLoan);
     toast('✅ Loan saved');
     if (window.posthog) posthog.capture('loan_saved', { is_edit: false, frequency });
   }
@@ -1218,8 +1242,7 @@ function addCCTransaction() {
   if (!date)                        { toast('⚠️ Pick a date'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
   const newTxn = { id: Date.now(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type };
-  ccTransactions.push(newTxn);
-  dbUpsert('cc_transactions', newTxn, toDbCCT);
+  ccTransactions.push(newTxn); dbUpsert('cc_transactions', newTxn, toDbCCT);
   saveData(); renderCCTransactions(); toast(type === 'charge' ? '✅ Charge added!' : '✅ Payment recorded!');
   if (window.posthog) posthog.capture('cc_transaction_added', { type, category: cat });
   document.getElementById('cct-amount').value = '';
