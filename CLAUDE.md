@@ -4,17 +4,21 @@ This file provides guidance to Claude when working with code in this repository.
 
 ## Project overview
 
-Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1318 lines). No framework, no build step, no dependencies except PostHog (CDN) and optional CDN scripts. Deployed to GitHub Pages with a custom domain. All financial data persists in `localStorage`. Open `index.html` directly in a browser to test locally — no server needed.
+Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1520 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (CDN), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
+
+Users can sign in with Google (data syncs to Supabase cloud DB) or use the app as a guest (data stays in `localStorage` only). Both modes work simultaneously — `saveData()` always writes to `localStorage`; `dbUpsert`/`dbDelete` additionally sync to Supabase when `currentUser` is set.
 
 **Important:** Google AdSense is loaded conditionally via a dynamic `<script>` injection guarded by `location.hostname === 'finaura.app'`. Do not revert this to a static `<script async src="...">` tag — AdSense contains an infinite loop that hangs the page on `file://` URLs (local dev).
+
+**Important:** OAuth (`signInWithGoogle`) redirects to `https://finaura.app` — it will not complete on `file://` or local file URLs. Test auth on the live site or a local HTTP server.
 
 ## Repository files
 
 | File | Purpose |
 |---|---|
-| `index.html` | Lean HTML shell — `<head>` with PostHog init, AdSense script, favicon link, inline SVG logo; all `<section>` page markup; links to `styles.css` and `app.js` |
-| `styles.css` | All app styles — layout, sidebar, cards, tables, forms, cashflow colours, landing overlay |
-| `app.js` | All JavaScript — data model, navigation, render functions, event handlers, INIT |
+| `index.html` | HTML shell — `<head>` with PostHog init, Supabase CDN, AdSense script, favicon; all `<section>` page markup; links to `styles.css` and `app.js` |
+| `styles.css` | All app styles — layout, sidebar, cards, tables, forms, cashflow colours, landing overlay, auth box, account menu |
+| `app.js` | All JavaScript — data model, Supabase auth/data layer, navigation, render functions, event handlers, INIT |
 | `favicon.svg` | Browser tab icon — teal rounded square with white F letterform and mint sparkline |
 | `legal.html` | Terms of Service and Privacy Policy (standalone page) |
 | `og-image.svg` | 1200×630 Open Graph image for social sharing previews |
@@ -41,9 +45,9 @@ git status
 
 The app is split into three files served by GitHub Pages:
 
-- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (including inline SVG logo in `.lp-logo`), sidebar (with inline SVG logo in `.sidebar-logo`), and all `<section class="page">` elements. Ends with `<script src="app.js"></script>` just before `</body>`. **PostHog and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
-- **`styles.css`** — all styles. Teal sidebar (`#0F766E`), card depth, cashflow cell colours, landing overlay (`lp-*` classes), dark mode block (`html[data-theme="dark"] ...`), semantic colour utility classes.
-- **`app.js`** (~1318 lines) — all JS logic. Sections are marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
+- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, Supabase JS CDN (`https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2`), Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (with `.lp-auth-box` Google sign-in UI), top-right `#account-menu` div, sidebar (with `#user-info` in footer), migration banner (`#migration-banner`), and all `<section class="page">` elements. Ends with `<script src="app.js"></script>` just before `</body>`. **PostHog, Supabase, and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
+- **`styles.css`** — all styles. Teal sidebar (`#0F766E`), mint accent `#2DD4BF`, auth box (`lp-auth-box`), account menu (`.account-menu*`), migration banner, dark mode block (`html[data-theme="dark"] ...`), semantic colour utility classes.
+- **`app.js`** (~1520 lines) — all JS logic. Sections are marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
 
 ### PostHog analytics
 
@@ -61,37 +65,85 @@ PostHog EU Cloud init snippet stays in `index.html` `<head>` — **never move it
 | `dark_mode_toggled` | `toggleDarkMode()` | `theme` (`'dark'` or `'light'`) |
 | `js_error` | `window.onerror` / `onunhandledrejection` | `message`, `source`, `line`, `stack` |
 
+### Supabase auth & cloud database
+
+Supabase project: `https://acqiduorpzwwegzaijdc.supabase.co`. The publishable key is in `app.js` (safe to expose client-side). Row Level Security (RLS) is enabled on all tables — every row has a `user_id` column and policies restrict access to the owner only.
+
+```js
+const { createClient: _sbCreate } = window.supabase;
+const db = _sbCreate('https://acqiduorpzwwegzaijdc.supabase.co', 'sb_publishable_...');
+let currentUser = null;
+```
+
+**Auth flow:**
+1. `signInWithGoogle()` — calls `db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://finaura.app' } })`. Redirects away to Google then back.
+2. On return, `db.auth.onAuthStateChange` fires `SIGNED_IN`. `loadUserData()` fetches all tables, replaces in-memory arrays, re-renders.
+3. On sign-out (`signOut()`), `SIGNED_OUT` fires and the page reloads (cleanest way to reset in-memory state).
+4. On page load, `db.auth.getSession()` checks for an active session (e.g. returning user with valid cookie). If found, data is loaded and the landing overlay is skipped. `checkFirstVisit()` is only called when no session exists.
+
+**DB tables** (snake_case columns) vs **JS objects** (camelCase):
+
+| Table | Key mapping functions |
+|---|---|
+| `income` | `toDbIncome` / `fromDbIncome` |
+| `expenses` | `toDbIncome` / `fromDbIncome` (same shape) |
+| `recurring` | `toDbRecurring` / `fromDbRecurring` (`startDate` ↔ `start_date`, `endDate` ↔ `end_date`) |
+| `credit_cards` | `toDbCard` / `fromDbCard` (`minType` ↔ `min_type`, etc.) |
+| `interest_free_deals` | `toDbDeal` / `fromDbDeal` (`cardId` ↔ `card_id`) |
+| `cc_transactions` | `toDbCCT` / `fromDbCCT` (`cardId` ↔ `card_id`) |
+| `loans` | `toDbLoan` / `fromDbLoan` (`totalAmount` ↔ `total_amount`, etc.) |
+
+**Generic helpers:**
+- `dbUpsert(table, jsObj, toDbFn)` — no-op if `currentUser` is null (guest mode). Adds `user_id` automatically.
+- `dbDelete(table, id)` — no-op if `currentUser` is null.
+
+**Every mutation function calls both `saveData()` (localStorage) and `dbUpsert`/`dbDelete` (Supabase).** Guest users only get the localStorage write; signed-in users get both. This means the app works fully offline/without an account at all times.
+
+**Migration banner** — after first sign-in, if `localStorage` still has financial data, `showMigrationBanner()` shows `#migration-banner`. `migrateFromLocalStorage()` upserts everything to Supabase (cards first, due to FK constraints from deals/transactions), then clears the localStorage keys. `dismissMigration()` hides the banner and sets `mf_migration_dismissed`.
+
+### Account menu (top-right)
+
+When signed in, a fixed `#account-menu` div appears at top-right of the page (`.account-menu`). It shows the user's Google avatar (or initials) and first name. Clicking opens a dropdown (`.account-menu-dropdown.open`) with:
+- Name + email header
+- Default currency (Soon placeholder)
+- Preferences (Soon placeholder)
+- Sign out (danger style)
+
+`updateUserUI()` in `app.js` drives all of this. It also updates `#user-info` in the sidebar footer to show a small "✓ Firstname" confirmation. When signed out, the menu is hidden and the sidebar note is cleared.
+
+`toggleAccountMenu()` handles open/close, and `_closeAccountMenu()` is registered as a one-time `document` click listener to close on outside click.
+
 ### Landing page overlay
 
-A full-screen `<div id="landing-overlay">` sits at the top of `<body>`, before `<div class="app">`. It is shown on first visit and hidden via JS on subsequent visits (or if the user already has data).
+A full-screen `<div id="landing-overlay">` sits at the top of `<body>`, before `<div class="app">`. The hero contains a `.lp-auth-box` with:
+- Google sign-in button (`.btn-google-signin`) — calls `signInWithGoogle()`
+- "or" divider (`.lp-auth-divider`)
+- "Continue without account" button (`.btn-continue-guest`) — calls `launchApp()`
+- Privacy note (`.lp-auth-note`)
 
-- `checkFirstVisit()` — called first in INIT. Adds `.hidden` class to `#landing-overlay` if `mf_launched` is set in localStorage, or if any financial data already exists (`mf_income`, `mf_recurring`, `mf_cards`). This ensures existing users are never interrupted.
-- `launchApp()` — called by the "Launch App" buttons. Sets `mf_launched = '1'` in localStorage and hides the overlay.
-- CSS: `#landing-overlay.hidden { display: none; }` drives visibility — no inline style manipulation.
+`checkFirstVisit()` hides the overlay if `mf_launched` is set or financial data already exists. It is only called from INIT when there is **no active Supabase session** — signed-in users bypass it via the async auth init.
+
+`launchApp()` sets `mf_launched = '1'` and hides the overlay (guest path).
 
 ### Sidebar collapse
 
 The entire sidebar can be toggled via a `☰` button (`.sidebar-toggle`).
 
-- `toggleSidebar()` — toggles `.sidebar-collapsed` class on `.app`, persists to `mf_sidebar_collapsed` in localStorage
-- `restoreSidebarState()` — reads `mf_sidebar_collapsed` on startup and restores state
+- `toggleSidebar()` — toggles `.sidebar-collapsed` on `.app`, persists to `mf_sidebar_collapsed`
+- `restoreSidebarState()` — reads `mf_sidebar_collapsed` on startup
 - CSS drives all visual changes: `.app.sidebar-collapsed .sidebar { transform: translateX(-230px); }` and `.app.sidebar-collapsed .main { margin-left: 0; }`
 
 ### Collapsible navigation
 
-The sidebar nav is grouped into four top-level sections (`overview`, `transactions`, `debt`, `planning`), each a `.nav-group` with id `navg-{key}`. Adjacent groups are separated by a subtle rule via `.nav-group + .nav-group { border-top: 1px solid rgba(255,255,255,0.1); }`.
+Four top-level `.nav-group` sections (`navg-overview`, `navg-transactions`, `navg-debt`, `navg-planning`). Debt section has two independently collapsible subsections (`navg-sub-creditcards`, `navg-sub-loans`).
 
-- `toggleNavGroup(key)` — toggles `.collapsed` class on the group. CSS rule `.nav-group.collapsed .nav-group-items { display: none; }` handles visibility. State persisted to `mf_nav_state` (`{key: bool}`).
-- `restoreNavState()` — restores all group and subgroup collapse states on startup.
-- The Debt section has two independently collapsible subsections (`navg-sub-creditcards`, `navg-sub-loans`) toggled via `toggleNavSubgroup(key)`. Persisted under `sub-creditcards` / `sub-loans` keys inside `mf_nav_state`.
-- **Pure CSS-class approach** — no `style.display` manipulation in JS for nav collapse. JS only adds/removes the `.collapsed` class.
-- **Mint dot indicator** — each `.nav-section` and `.nav-subsection` contains `<span class="nav-dot"></span>`. CSS sets it mint (`#2DD4BF`) when expanded, faded white (`rgba(255,255,255,0.3)`) when the group is collapsed.
-
-Current nav item labels (sidebar `index.html`): Dashboard · Recurring · One-off · Manage Credit Cards · Manage Transactions · Manage 0% Periods · Calculators · Manage Loans · Cashflow.
+- `toggleNavGroup(key)` / `toggleNavSubgroup(key)` — toggle `.collapsed` class. State persisted to `mf_nav_state`.
+- `restoreNavState()` — restores all states on startup.
+- **Pure CSS-class approach** — JS only toggles `.collapsed`; CSS rule `.nav-group.collapsed .nav-group-items { display: none; }` drives visibility.
 
 ### Navigation / page model
 
-Pages are `<section class="page" id="page-{name}">` elements. Only one is `active` at a time. `navigate(page)` activates the section and calls the render function:
+Pages are `<section class="page" id="page-{name}">` elements. `navigate(page)` activates one and calls its render function:
 
 ```js
 const renders = {
@@ -101,19 +153,17 @@ const renders = {
   cashflow: renderCashflow,
   credit: renderCardList,
   cctransactions: renderCCTransactions,
-  calculators: () => {},   // static page, no render needed
+  calculators: () => {},
   deals: renderDealsPage,
   loans: renderLoansPage
 };
 ```
 
-`navigate()` also fires a `page_viewed` PostHog event.
-
-Adding a new page requires: (1) sidebar nav item in `index.html`, (2) `<section id="page-{name}">` in `index.html` `<main>`, (3) entry in the `renders` map in `app.js`, (4) `renderXxx()` function in `app.js`. If the new page uses date inputs, add it to `setDefaultDates()`.
+Adding a new page requires: (1) sidebar nav item in `index.html`, (2) `<section id="page-{name}">` in `index.html` `<main>`, (3) entry in the `renders` map, (4) `renderXxx()` function in `app.js`. If the page uses date inputs, add it to `setDefaultDates()`.
 
 ### Data model
 
-All state is module-level `let` variables, loaded once on startup, saved via `saveData()` after every mutation.
+All state is module-level `let` variables, loaded from `localStorage` on startup (or replaced by `loadUserData()` if signed in). `saveData()` writes all seven arrays to `localStorage` after every mutation.
 
 | Variable | `localStorage` key | Shape |
 |---|---|---|
@@ -125,134 +175,123 @@ All state is module-level `let` variables, loaded once on startup, saved via `sa
 | `ccTransactions` | `mf_cc_transactions` | `[{id, cardId, date, amount, category, description, type}]` where `type` is `'charge'` or `'payment'` |
 | `loansData` | `mf_loans` | `[{id, lender, totalAmount, repaymentAmount, apr, frequency, startDate, endDate, note}]` |
 
-**Other localStorage keys (not financial data):**
+**Other localStorage keys:**
 
 | Key | Purpose |
 |---|---|
-| `mf_launched` | `'1'` once user has clicked "Launch App" — hides landing overlay on return visits |
-| `mf_sidebar_collapsed` | `'1'` if sidebar is collapsed, `'0'` if expanded |
-| `mf_nav_state` | JSON object `{overview: bool, transactions: bool, debt: bool, planning: bool, 'sub-creditcards': bool, 'sub-loans': bool}` |
-| `mf_dark_mode` | `'dark'` or `'light'` — persists dark mode preference across sessions |
+| `mf_launched` | `'1'` once user clicks "Continue without account" — hides landing overlay on return guest visits |
+| `mf_sidebar_collapsed` | `'1'` if sidebar collapsed |
+| `mf_nav_state` | JSON `{overview, transactions, debt, planning, 'sub-creditcards', 'sub-loans': bool}` |
+| `mf_dark_mode` | `'dark'` or `'light'` |
+| `mf_migration_dismissed` | `'1'` once migration banner is dismissed — prevents it showing again |
 
 **IDs** are always `Date.now()` integers. **Dates** are always `YYYY-MM-DD` strings; always parse with `new Date(ds + 'T00:00:00')` to avoid timezone shifts.
 
-`saveData()` must be called after every mutation to any financial data variable. It writes all seven arrays to `localStorage` in one pass.
-
-#### Data migration
-
-`ccTransactions` was split from a legacy `mf_cc_payments` key. A self-invoking migration function at startup absorbs any old entries and removes the stale key. When adding new fields to existing objects, follow the same pattern: load with a `.map(x => ({ ...x, newField: x.newField ?? default }))` default.
-
 ### Dark mode
 
-Dark mode is toggled via `html[data-theme="dark"]` attribute on `<html>` (`document.documentElement`).
+- `toggleDarkMode()` — flips `html[data-theme="dark"]` attribute, saves to `mf_dark_mode`, fires PostHog event, updates button.
+- `restoreDarkMode()` — called first in INIT.
+- **Critical — inline `style.color` bypasses dark mode.** Never use `element.style.color = '#hex'` or `style="color:#hex"` for data-bearing colours. Always use semantic utility classes.
 
-- `toggleDarkMode()` — flips the attribute, saves preference to `mf_dark_mode` in localStorage, fires PostHog `dark_mode_toggled`, updates the button icon/label.
-- `restoreDarkMode()` — called first in INIT (before `checkFirstVisit`). Reads `mf_dark_mode` and restores theme and button state.
-- The toggle button lives in `.sidebar-footer` in `index.html`: `<button class="dark-toggle" onclick="toggleDarkMode()">`.
-- **CSS rule structure**: the dark mode block in `styles.css` uses `html[data-theme="dark"] .selector { ... }` selectors. Semantic utility classes (`.text-income`, `.value-pos`, etc.) have their dark overrides placed **after** the main dark mode block so cascade order makes them win over any general rules like `html[data-theme="dark"] .bar-value { color: #E2E8F0; }`.
-
-**Critical — inline `style.color` bypasses dark mode.** Never use `element.style.color = '#hex'` or template `style="color:#hex"` for data-bearing colours. These set inline styles with the highest CSS specificity and cannot be overridden by class-based dark mode rules. Always use semantic utility classes instead.
-
-**Semantic colour utility classes** (defined at end of `styles.css`, with `html[data-theme="dark"]` overrides for each):
+**Semantic colour utility classes** (defined at end of `styles.css`, with `html[data-theme="dark"]` overrides):
 
 | Class | Light | Dark | Usage |
 |---|---|---|---|
-| `.text-income` | `#16a34a` | `#10B981` | Income amounts, income summary figures |
-| `.text-expense` | `#dc2626` | `#f87171` | Expense amounts, expense summary figures |
-| `.text-muted` | `#888` | `#64748b` | Secondary text, descriptions |
-| `.text-muted-sm` | `#888 / 0.82rem` | `#64748b` | Small secondary text, dates, notes |
-| `.text-cc` | `#7c3aed` | `#a78bfa` | Credit card amounts, CC-related values |
+| `.text-income` | `#16a34a` | `#10B981` | Income amounts |
+| `.text-expense` | `#dc2626` | `#f87171` | Expense amounts |
+| `.text-muted` | `#888` | `#64748b` | Secondary text |
+| `.text-muted-sm` | `#888 / 0.82rem` | `#64748b` | Small secondary text |
+| `.text-cc` | `#7c3aed` | `#a78bfa` | Credit card amounts |
 | `.value-pos` | `#0F766E` | `#2DD4BF` | Positive net values |
 | `.value-neg` | `#dc2626` | `#f87171` | Negative net values |
-| `.text-paid-off` | `#16a34a bold` | `#34D399` | Card tracker "✓ Paid off" cells |
-| `.text-deal-active` | `#065f46 bold` | `#34D399` | Card tracker cells with active 0% deal |
-| `.dash-trend-pos` | `#10B981` | `#10B981` | Dashboard trend badge — positive |
-| `.dash-trend-neg` | `#ef4444` | `#f87171` | Dashboard trend badge — negative |
+| `.text-paid-off` | `#16a34a bold` | `#34D399` | Card tracker "✓ Paid off" |
+| `.text-deal-active` | `#065f46 bold` | `#34D399` | Card tracker 0% deal cells |
+| `.dash-trend-pos` | `#10B981` | `#10B981` | Dashboard trend — positive |
+| `.dash-trend-neg` | `#ef4444` | `#f87171` | Dashboard trend — negative |
 
 ### Dashboard KPI cards
 
-`renderDashboard()` calls three helpers for the sparkline/trend row:
+`renderDashboard()` uses:
+- `getMonthTotals(data, nMonths)` — monthly totals array (oldest → newest)
+- `buildSparkline(values, color)` — inline SVG polyline (colour passed directly, not via CSS)
+- `trendBadge(curr, prev, lowerIsBetter)` — `<span class="dash-trend dash-trend-pos/neg">` string
 
-- `getMonthTotals(data, nMonths)` — returns an array of `nMonths` monthly totals (oldest → newest) from an income or expense array.
-- `buildSparkline(values, color)` — returns an inline SVG polyline string. Takes a colour hex directly (sparklines are SVG strokes, not affected by dark mode CSS class rules).
-- `trendBadge(curr, prev, lowerIsBetter)` — returns a `<span class="dash-trend dash-trend-pos/neg">` string comparing the last two months.
+Each KPI card has `.card-kpi-row` (value + sparkline) and `.card-kpi-footer` (count + trend badge).
 
-Each KPI card has a `.card-kpi-row` (value + sparkline side-by-side) and a `.card-kpi-footer` (count + trend badge).
+### Cashflow projection engine (`generateProjection`, ~line 318 in `app.js`)
 
-### Cashflow projection engine (`generateProjection`, line ~184 in `app.js`)
-
-Produces one row per month by rolling card balances forward. Order of operations per month is critical:
+Rolls card balances forward month by month. Order per month is critical:
 
 1. Recurring income → `recInc`
-2. Recurring expenses → `recExp`
+2. Recurring expenses + loan repayments → `recExp`
 3. One-off income from `incomeData` → `oneOffInc`
 4. One-off expenses from `expenseData` → `oneOffExp`
-5. **CC charges** (`ccTransactions` where `type !== 'payment'`) → increase `card.balance`
-6. **CC payments** (`ccTransactions` where `type === 'payment'`) → decrease `card.balance`; also added to `oneOffExp` / `oneOffExpItems` (cash outflow)
-7. Interest + minimum payment for each card → `ccTotal`
+5. **CC charges** (`type !== 'payment'`) → increase `card.balance`
+6. **CC payments** (`type === 'payment'`) → decrease `card.balance`; added to `oneOffExp` (cash outflow)
+7. Interest + minimum payment per card → `ccTotal`
 8. `net = recInc + oneOffInc - recExp - oneOffExp - ccTotal`
 
-Steps 5 and 6 happen **before** interest (step 7) so payments/charges affect that month's interest calculation. Do not reorder.
-
-Interest-free deals are handled by `getInterestFreeAmount(cardId, monthStart)`, which returns the total 0% amount active on that card in that month. Interest is charged only on `balance - ifAmount`.
+Steps 5 and 6 happen **before** interest (step 7). Do not reorder.
 
 ### Key UI patterns
 
-**Inline row editing** — a `let editingXxxId = null` flag causes the render function to emit `<input>` / `<select>` elements with `data-field="..."` attributes for the row being edited, instead of plain text. The save function reads them back via `row.querySelector('[data-field="..."]')`. See `renderCCTransactions` / `saveCCTEdit` for the canonical implementation.
-
-**Type toggles** — Income/Expense or Charge/Payment pairs use `.toggle-btn.income` / `.toggle-btn.expense` CSS classes. Active state is toggled with `.classList.toggle('active', condition)`. The active styling is already in CSS — do not add inline styles for the active state.
-
-**Filter tabs** — Built dynamically in the render function (not in HTML). Pattern: `'All'` tab plus one tab per card/entity. Active tab stored in a `let currentXxxFilter` module-level variable.
-
-**Toasts** — `toast(msg)` for all user feedback. 2.5 s auto-dismiss.
-
-**Read-only merged rows** — CC payments appear in the One-off Transactions list as read-only rows (no delete button, has a badge linking back to the source page). Flag with `_ccPayment: true` on the merged object. Check `r._ccPayment` in the render to conditionally render the action cell.
+- **Inline row editing** — `let editingXxxId = null` flag causes render to emit `<input data-field="...">` for that row. Save reads back via `row.querySelector('[data-field="..."]')`. See `renderCCTransactions` / `saveCCTEdit`.
+- **Type toggles** — `.toggle-btn.income` / `.toggle-btn.expense`. Active state via `.classList.toggle('active', condition)`.
+- **Filter tabs** — built dynamically in render functions. Active tab in `let currentXxxFilter`.
+- **Toasts** — `toast(msg)` for all feedback. 2.5 s auto-dismiss.
+- **Read-only merged rows** — CC payments appear in One-off list as read-only rows (`_ccPayment: true` flag).
 
 ### CSS conventions
 
-All colours use hex literals (no CSS variables for theme colours yet). Sidebar is teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
+Sidebar teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 
-- `.nav-dot` — mint dot in nav section/subsection headers; fades to white when group is collapsed
-- `.badge-income` green, `.badge-expense` red, `.badge-freq` purple, `.badge-oneoff` amber, `.badge-card` light purple, `.badge-upcoming` blue
-- `.btn-sm-ghost` neutral action, `.btn-sm-danger` destructive action
-- `.cct-edit-input` — shared style for all inline edit inputs/selects
-- `.cf-positive` / `.cf-negative` / `.cf-zero` — cashflow table number colouring
-- `.no-cards-notice` — amber warning box used when a section requires cards to be set up first
-- `.panel-info` / `.panel-info-title` / `.panel-info-body` — info panel on the 0% Deals page (has dark mode overrides)
-- `.dark-toggle` — sidebar footer dark mode toggle button
-- `lp-*` classes — landing page overlay only; all prefixed `lp-` to avoid collisions with app styles
-- Semantic colour utility classes — see the **Dark mode** section above for the full table. Always use these instead of inline `style="color:#..."` for any data-bearing colour.
+- `.nav-dot` — mint dot in nav headers; fades when group collapsed
+- `.badge-income/.badge-expense/.badge-freq/.badge-oneoff/.badge-card/.badge-upcoming` — type badges
+- `.btn-sm-ghost` neutral, `.btn-sm-danger` destructive
+- `.cct-edit-input` — inline edit inputs/selects
+- `.cf-positive/.cf-negative/.cf-zero` — cashflow table colouring
+- `.no-cards-notice` — amber warning box
+- `.panel-info/.panel-info-title/.panel-info-body` — info panel (0% Deals page)
+- `.dark-toggle` — sidebar footer dark mode button
+- `lp-*` — landing page overlay only
+- `.lp-auth-box` — hero sign-in card (dark glass style matching landing overlay)
+- `.btn-google-signin` — white Google button (follows Google branding guidelines)
+- `.btn-continue-guest` — ghost button for no-account path
+- `.migration-banner` — amber banner shown post sign-in when localStorage data exists
+- `.account-menu` / `.account-menu-btn` / `.account-menu-dropdown` — fixed top-right account dropdown (has dark mode overrides)
+- Semantic colour utility classes — see **Dark mode** section. Always use instead of inline `style="color:#..."`.
 
 ### JS section locations in `app.js` (approximate line numbers)
 
 | Section | ~Line |
 |---|---|
 | DATA + saveData | 2 |
-| NAVIGATION | 34 |
-| HELPERS (fmt, toast, dates, getMonthTotals, buildSparkline, trendBadge) | 59 |
-| DEALS helper (getInterestFreeAmount) | 133 |
-| RECURRING date generation | 149 |
-| CASHFLOW ENGINE (generateProjection) | 184 |
-| DASHBOARD | 304 |
-| ONE-OFF TRANSACTIONS | 364 |
-| RECURRING | 453 |
-| CASHFLOW RENDER | 524 |
-| CREDIT CARDS | 596 |
-| 0% DEALS | 696 |
-| LOANS | 848 |
-| CALCULATORS | 981 |
-| CARD TRANSACTIONS | 1042 |
-| COLLAPSIBLE NAV (toggleSidebar, toggleNavGroup, toggleNavSubgroup, restoreNavState) | 1208 |
-| DARK MODE (toggleDarkMode, restoreDarkMode) | 1254 |
-| LANDING PAGE (launchApp, checkFirstVisit) | 1280 |
-| INIT | 1300 |
+| SUPABASE (client, field mapping, dbUpsert/dbDelete, loadUserData, auth, updateUserUI, migration) | 33 |
+| NAVIGATION | 166 |
+| HELPERS (fmt, toast, dates, getMonthTotals, buildSparkline, trendBadge) | 199 |
+| DEALS helper (getInterestFreeAmount) | 266 |
+| RECURRING date generation | 283 |
+| CASHFLOW ENGINE (generateProjection) | 318 |
+| DASHBOARD | 437 |
+| ONE-OFF TRANSACTIONS | 499 |
+| RECURRING | 589 |
+| CASHFLOW RENDER | 661 |
+| CREDIT CARDS | 731 |
+| 0% DEALS | 831 |
+| LOANS | 983 |
+| CALCULATORS | 1116 |
+| CARD TRANSACTIONS | 1177 |
+| COLLAPSIBLE NAV | 1343 |
+| DARK MODE | 1389 |
+| LANDING PAGE (launchApp, checkFirstVisit) | 1413 |
+| INIT | 1435 |
 
 Use `grep -n "^//  "` on `app.js` to find the current line of any section quickly (double-space after `//`).
 
 ## Efficient editing approach
 
-1. **Grep before reading** — use `grep -n "functionName\|id=\"element-id\""` on the relevant file (`app.js`, `styles.css`, or `index.html`) to locate the exact lines needed before calling Read.
+1. **Grep before reading** — use `grep -n "functionName\|id=\"element-id\""` on the relevant file to locate exact lines before calling Read.
 2. **Read targeted ranges** — pass `offset` + `limit` to Read; avoid reading the whole file.
-3. **Edit surgically** — prefer small `Edit` calls over large rewrites. When replacing a function, match on the full function signature + first line so the `old_string` is unique.
-4. **Verify with grep** — after adding a new data variable or function, grep to confirm no stale references to old names remain.
-5. **Don't trust bash line counts** — the bash sandbox mount is frequently stale. Use `Read` with known offsets to verify actual file content in `index.html`, `styles.css`, and `app.js`.
+3. **Edit surgically** — prefer small `Edit` calls over large rewrites.
+4. **Verify with grep** — after adding a new variable or function, grep to confirm no stale references remain.
+5. **Don't trust bash line counts** — the bash sandbox mount is frequently stale. Use `Read` with known offsets to verify actual file content.
