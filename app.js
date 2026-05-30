@@ -123,13 +123,8 @@ function updateUserUI() {
     const ddEmail = document.getElementById('account-dropdown-email');
     if (ddName)  ddName.textContent  = name;
     if (ddEmail) ddEmail.textContent = email;
-    // Sidebar note
-    const sidebarInfo = document.getElementById('user-info');
-    if (sidebarInfo) sidebarInfo.innerHTML = `<div class="user-profile"><span>✓</span><span>${shortName}</span></div>`;
   } else {
     menuEl.style.display = 'none';
-    const sidebarInfo = document.getElementById('user-info');
-    if (sidebarInfo) sidebarInfo.innerHTML = '';
   }
 }
 
