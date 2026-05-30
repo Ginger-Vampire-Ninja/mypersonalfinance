@@ -49,6 +49,9 @@
     }
   </script>
 
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -248,6 +251,7 @@
 
     </nav>
     <div class="sidebar-footer">
+      <div id="user-info"></div>
       <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">
         <span id="dark-toggle-icon">🌙</span> <span id="dark-toggle-label">Dark mode</span>
       </button>
