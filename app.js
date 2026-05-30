@@ -33,11 +33,10 @@ function saveData() {
 // ══════════════════════════════════════════════════
 //  SUPABASE — client, field mapping, data layer, auth
 // ══════════════════════════════════════════════════
-const { createClient: _sbCreate } = window.supabase;
-const db = _sbCreate(
-  'https://acqiduorpzwwegzaijdc.supabase.co',
-  'sb_publishable_BNdn9Z-B74oF3XrRZlu-Rw_ePCyaU2f'
-);
+const _sbCreate = (window.supabase || {}).createClient;
+const db = _sbCreate
+  ? _sbCreate('https://acqiduorpzwwegzaijdc.supabase.co', 'sb_publishable_BNdn9Z-B74oF3XrRZlu-Rw_ePCyaU2f')
+  : null;
 let currentUser = null;
 
 // ── Field mapping (camelCase JS ↔ snake_case DB) ──
@@ -56,12 +55,12 @@ function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: 
 
 // ── Generic DB helpers ──
 async function dbUpsert(table, jsObj, toDbFn) {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   const { error } = await db.from(table).upsert({ ...toDbFn(jsObj), user_id: currentUser.id });
   if (error) console.error('dbUpsert', table, error);
 }
 async function dbDelete(table, id) {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   const { error } = await db.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
   if (error) console.error('dbDelete', table, error);
 }
@@ -1473,6 +1472,7 @@ renderDashboard();
 renderOneoffList();
 
 (async () => {
+  if (!db) { checkFirstVisit(); return; }
   const { data: { session } } = await db.auth.getSession();
   if (session) {
     currentUser = session.user;
