@@ -31,6 +31,165 @@ function saveData() {
 }
 
 // ══════════════════════════════════════════════════
+//  SUPABASE — client, field mapping, data layer, auth
+// ══════════════════════════════════════════════════
+const { createClient: _sbCreate } = window.supabase;
+const db = _sbCreate(
+  'https://acqiduorpzwwegzaijdc.supabase.co',
+  'sb_publishable_BNdn9Z-B74oF3XrRZlu-Rw_ePCyaU2f'
+);
+let currentUser = null;
+
+// ── Field mapping (camelCase JS ↔ snake_case DB) ──
+function toDbIncome(r)      { return { id: r.id, date: r.date, category: r.category, amount: r.amount, description: r.description || null }; }
+function fromDbIncome(r)    { return { id: r.id, date: r.date, category: r.category, amount: parseFloat(r.amount), description: r.description }; }
+function toDbRecurring(r)   { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: r.amount, frequency: r.frequency, start_date: r.startDate, end_date: r.endDate || null }; }
+function fromDbRecurring(r) { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: parseFloat(r.amount), frequency: r.frequency, startDate: r.start_date, endDate: r.end_date }; }
+function toDbCard(c)        { return { id: c.id, name: c.name, balance: c.balance, apr: c.apr, min_type: c.minType, min_pct: c.minPct || null, min_floor: c.minFloor || null, min_fixed: c.minFixed || null }; }
+function fromDbCard(c)      { return { id: c.id, name: c.name, balance: parseFloat(c.balance), apr: parseFloat(c.apr), minType: c.min_type, minPct: c.min_pct ? parseFloat(c.min_pct) : null, minFloor: c.min_floor ? parseFloat(c.min_floor) : null, minFixed: c.min_fixed ? parseFloat(c.min_fixed) : null }; }
+function toDbDeal(d)        { return { id: d.id, card_id: d.cardId, amount: d.amount, start_date: d.startDate, end_date: d.endDate, note: d.note || null }; }
+function fromDbDeal(d)      { return { id: d.id, cardId: d.card_id, amount: parseFloat(d.amount), startDate: d.start_date, endDate: d.end_date, note: d.note }; }
+function toDbCCT(t)         { return { id: t.id, card_id: t.cardId, date: t.date, amount: t.amount, category: t.category, description: t.description || null, type: t.type }; }
+function fromDbCCT(t)       { return { id: t.id, cardId: t.card_id, date: t.date, amount: parseFloat(t.amount), category: t.category, description: t.description, type: t.type || 'charge' }; }
+function toDbLoan(l)        { return { id: l.id, lender: l.lender, total_amount: l.totalAmount, repayment_amount: l.repaymentAmount, apr: l.apr || null, frequency: l.frequency, start_date: l.startDate, end_date: l.endDate || null, note: l.note || null }; }
+function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: parseFloat(l.totalAmount), repaymentAmount: parseFloat(l.repaymentAmount), apr: l.apr ? parseFloat(l.apr) : null, frequency: l.frequency, startDate: l.start_date, endDate: l.end_date, note: l.note }; }
+
+// ── Generic DB helpers ──
+async function dbUpsert(table, jsObj, toDbFn) {
+  if (!currentUser) return;
+  const { error } = await db.from(table).upsert({ ...toDbFn(jsObj), user_id: currentUser.id });
+  if (error) console.error('dbUpsert', table, error);
+}
+async function dbDelete(table, id) {
+  if (!currentUser) return;
+  const { error } = await db.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
+  if (error) console.error('dbDelete', table, error);
+}
+
+// ── Load all data for signed-in user ──
+async function loadUserData() {
+  const uid = currentUser.id;
+  const [inc, exp, rec, cards, deals, cct, loans] = await Promise.all([
+    db.from('income').select('*').eq('user_id', uid),
+    db.from('expenses').select('*').eq('user_id', uid),
+    db.from('recurring').select('*').eq('user_id', uid),
+    db.from('credit_cards').select('*').eq('user_id', uid),
+    db.from('interest_free_deals').select('*').eq('user_id', uid),
+    db.from('cc_transactions').select('*').eq('user_id', uid),
+    db.from('loans').select('*').eq('user_id', uid),
+  ]);
+  incomeData        = (inc.data   || []).map(fromDbIncome);
+  expenseData       = (exp.data   || []).map(fromDbIncome);
+  recurringData     = (rec.data   || []).map(fromDbRecurring);
+  creditCards       = (cards.data || []).map(fromDbCard);
+  interestFreeDeals = (deals.data || []).map(fromDbDeal);
+  ccTransactions    = (cct.data   || []).map(fromDbCCT);
+  loansData         = (loans.data || []).map(fromDbLoan);
+}
+
+// ── Auth functions ──
+async function signInWithGoogle() {
+  const { error } = await db.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: 'https://finaura.app' }
+  });
+  if (error) toast('⚠️ Sign in failed: ' + error.message);
+}
+async function signOut() {
+  document.getElementById('account-menu-dropdown')?.classList.remove('open');
+  await db.auth.signOut();
+}
+
+// ── Account menu UI ──
+function updateUserUI() {
+  const menuEl = document.getElementById('account-menu');
+  if (!menuEl) return;
+  if (currentUser) {
+    const name    = currentUser.user_metadata?.full_name || currentUser.email || 'Account';
+    const email   = currentUser.email || '';
+    const avatar  = currentUser.user_metadata?.avatar_url;
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const shortName = name.split(' ')[0];
+    menuEl.style.display = 'block';
+    const avatarEl = document.getElementById('account-menu-avatar-placeholder');
+    if (avatar && avatarEl) {
+      avatarEl.outerHTML = `<img class="account-menu-avatar" id="account-menu-avatar-placeholder" src="${avatar}" alt=""/>`;
+    } else if (avatarEl) {
+      avatarEl.textContent = initials;
+    }
+    const nameEl = document.getElementById('account-menu-name');
+    if (nameEl) nameEl.textContent = shortName;
+    const ddName  = document.getElementById('account-dropdown-name');
+    const ddEmail = document.getElementById('account-dropdown-email');
+    if (ddName)  ddName.textContent  = name;
+    if (ddEmail) ddEmail.textContent = email;
+    // Sidebar note
+    const sidebarInfo = document.getElementById('user-info');
+    if (sidebarInfo) sidebarInfo.innerHTML = `<div class="user-profile"><span>✓</span><span>${shortName}</span></div>`;
+  } else {
+    menuEl.style.display = 'none';
+    const sidebarInfo = document.getElementById('user-info');
+    if (sidebarInfo) sidebarInfo.innerHTML = '';
+  }
+}
+
+function toggleAccountMenu() {
+  const dropdown = document.getElementById('account-menu-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.toggle('open');
+  if (dropdown.classList.contains('open')) {
+    setTimeout(() => document.addEventListener('click', _closeAccountMenu, { once: true }), 0);
+  }
+}
+function _closeAccountMenu(e) {
+  const menu = document.getElementById('account-menu');
+  if (menu && !menu.contains(e.target)) {
+    document.getElementById('account-menu-dropdown')?.classList.remove('open');
+  }
+}
+
+// ── Migration from localStorage ──
+function showMigrationBanner() {
+  if (localStorage.getItem('mf_migration_dismissed')) return;
+  const el = document.getElementById('migration-banner');
+  if (el) el.style.display = 'flex';
+}
+function dismissMigration() {
+  const el = document.getElementById('migration-banner');
+  if (el) el.style.display = 'none';
+  localStorage.setItem('mf_migration_dismissed', '1');
+}
+async function migrateFromLocalStorage() {
+  if (!currentUser) return;
+  toast('⏳ Importing your data…');
+  const uid = currentUser.id;
+  try {
+    const lsIncome    = JSON.parse(localStorage.getItem('mf_income')          || '[]');
+    const lsExpenses  = JSON.parse(localStorage.getItem('mf_expenses')        || '[]');
+    const lsRecurring = JSON.parse(localStorage.getItem('mf_recurring')       || '[]');
+    const lsCards     = JSON.parse(localStorage.getItem('mf_cards')           || '[]');
+    const lsDeals     = JSON.parse(localStorage.getItem('mf_deals')           || '[]');
+    const lsCCT       = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]');
+    const lsLoans     = JSON.parse(localStorage.getItem('mf_loans')           || '[]');
+    if (lsCards.length)     await db.from('credit_cards').upsert(lsCards.map(c => ({ ...toDbCard(c), user_id: uid })));
+    if (lsIncome.length)    await db.from('income').upsert(lsIncome.map(r => ({ ...toDbIncome(r), user_id: uid })));
+    if (lsExpenses.length)  await db.from('expenses').upsert(lsExpenses.map(r => ({ ...toDbIncome(r), user_id: uid })));
+    if (lsRecurring.length) await db.from('recurring').upsert(lsRecurring.map(r => ({ ...toDbRecurring(r), user_id: uid })));
+    if (lsDeals.length)     await db.from('interest_free_deals').upsert(lsDeals.map(d => ({ ...toDbDeal(d), user_id: uid })));
+    if (lsCCT.length)       await db.from('cc_transactions').upsert(lsCCT.map(t => ({ ...toDbCCT(t), user_id: uid })));
+    if (lsLoans.length)     await db.from('loans').upsert(lsLoans.map(l => ({ ...toDbLoan(l), user_id: uid })));
+    ['mf_income','mf_expenses','mf_recurring','mf_cards','mf_deals','mf_cc_transactions','mf_loans'].forEach(k => localStorage.removeItem(k));
+    await loadUserData();
+    dismissMigration();
+    renderDashboard(); renderOneoffList();
+    toast('✅ Data imported successfully!');
+  } catch (err) {
+    console.error('Migration error:', err);
+    toast('⚠️ Import failed — please try again');
+  }
+}
+
+// ══════════════════════════════════════════════════
 //  NAVIGATION
 // ══════════════════════════════════════════════════
 function navigate(page) {
@@ -389,14 +548,15 @@ function addOneoff() {
   if (!date) { toast('⚠️ Please pick a date'); return; }
   if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
   const entry = { id:Date.now(), date, category:cat, amount:amt, description:desc||cat };
-  if (currentOneoffType==='income') { incomeData.push(entry); } else { expenseData.push(entry); }
+  if (currentOneoffType==='income') { incomeData.push(entry); dbUpsert('income', entry, toDbIncome); }
+  else { expenseData.push(entry); dbUpsert('expenses', entry, toDbIncome); }
   saveData(); renderOneoffList(); toast('✅ Entry added!');
   if (window.posthog) posthog.capture('transaction_added', { type: currentOneoffType, category: cat });
   document.getElementById('oneoff-amount').value=''; document.getElementById('oneoff-description').value='';
 }
 
-function deleteIncome(id)  { incomeData =incomeData.filter(r=>r.id!==id);  saveData(); renderOneoffList(); toast('🗑 Deleted'); }
-function deleteExpense(id) { expenseData=expenseData.filter(r=>r.id!==id); saveData(); renderOneoffList(); toast('🗑 Deleted'); }
+function deleteIncome(id)  { incomeData =incomeData.filter(r=>r.id!==id);  dbDelete('income', id);   saveData(); renderOneoffList(); toast('🗑 Deleted'); }
+function deleteExpense(id) { expenseData=expenseData.filter(r=>r.id!==id); dbDelete('expenses', id); saveData(); renderOneoffList(); toast('🗑 Deleted'); }
 
 function renderOneoffList() {
   const tbody = document.getElementById('oneoff-table-body');
@@ -466,12 +626,13 @@ function addRecurring() {
   if (!name) { toast('⚠️ Enter a name'); return; }
   if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
   if (!start) { toast('⚠️ Pick a start date'); return; }
-  recurringData.push({ id:Date.now(), type:currentRecType, name, category:cat, amount:amt, frequency:freq, startDate:start, endDate:end||null });
+  const rec = { id:Date.now(), type:currentRecType, name, category:cat, amount:amt, frequency:freq, startDate:start, endDate:end||null };
+  recurringData.push(rec); dbUpsert('recurring', rec, toDbRecurring);
   saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('✅ Recurring transaction added!');
   if (window.posthog) posthog.capture('recurring_added', { type: currentRecType, frequency: freq, category: cat });
   document.getElementById('rec-name').value=''; document.getElementById('rec-amount').value=''; document.getElementById('rec-end').value='';
 }
-function deleteRecurring(id) { recurringData=recurringData.filter(r=>r.id!==id); saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted'); }
+function deleteRecurring(id) { recurringData=recurringData.filter(r=>r.id!==id); dbDelete('recurring', id); saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted'); }
 function renderRecurringTable() {
   const tbody=document.getElementById('recurring-table-body');
   // Build loan read-only rows
@@ -617,6 +778,7 @@ function saveCard() {
   if (minType==='fixed'&&(isNaN(minFixed)||minFixed<=0)){ toast('⚠️ Enter a valid fixed payment'); return; }
   const card={ id:editId?parseInt(editId):Date.now(), name, balance, apr, minType, minPct, minFloor, minFixed };
   if (editId) creditCards=creditCards.map(c=>c.id===card.id?card:c); else creditCards.push(card);
+  dbUpsert('credit_cards', card, toDbCard);
   saveData(); renderCardList(); clearCardForm(); toast(editId?'✅ Card updated!':'✅ Card saved!');
   if (window.posthog) posthog.capture('card_saved', { is_edit: !!editId, min_type: minType });
 }
@@ -648,9 +810,11 @@ function editCard(id) {
 function deleteCard(id) {
   if (interestFreeDeals.some(d=>d.cardId===id)) {
     if (!confirm('This card has interest-free deals linked to it. Deleting the card will also remove those deals. Continue?')) return;
+    interestFreeDeals.filter(d=>d.cardId===id).forEach(d => dbDelete('interest_free_deals', d.id));
     interestFreeDeals=interestFreeDeals.filter(d=>d.cardId!==id);
   }
   creditCards=creditCards.filter(c=>c.id!==id);
+  dbDelete('credit_cards', id);
   saveData(); renderCardList(); toast('🗑 Card deleted');
 }
 function renderCardList() {
@@ -808,7 +972,7 @@ function saveDeal() {
   const deal = { id: editId ? parseInt(editId) : Date.now(), cardId, amount, startDate: start, endDate: end, note };
   if (editId) interestFreeDeals = interestFreeDeals.map(d => d.id === deal.id ? deal : d);
   else        interestFreeDeals.push(deal);
-
+  dbUpsert('interest_free_deals', deal, toDbDeal);
   saveData(); clearDealForm(); renderDealsPage(); toast(editId ? '✅ Deal updated!' : '✅ Deal saved!');
 }
 
@@ -841,6 +1005,7 @@ function editDeal(id) {
 
 function deleteDeal(id) {
   interestFreeDeals = interestFreeDeals.filter(d => d.id !== id);
+  dbDelete('interest_free_deals', id);
   saveData(); renderDealsPage(); toast('🗑 Deal deleted');
 }
 
@@ -927,13 +1092,14 @@ function saveLoan() {
   const editId = document.getElementById('loan-edit-id').value;
   if (editId) {
     const idx = loansData.findIndex(l => l.id === parseInt(editId));
-    if (idx !== -1) loansData[idx] = { ...loansData[idx], lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note };
+    if (idx !== -1) { loansData[idx] = { ...loansData[idx], lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note }; dbUpsert('loans', loansData[idx], toDbLoan); }
     editingLoanId = null;
     toast('✅ Loan updated');
     if (window.posthog) posthog.capture('loan_saved', { is_edit: true, frequency });
   } else {
     const id = Date.now();
-    loansData.push({ id, lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note });
+    const loan = { id, lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note };
+    loansData.push(loan); dbUpsert('loans', loan, toDbLoan);
     toast('✅ Loan saved');
     if (window.posthog) posthog.capture('loan_saved', { is_edit: false, frequency });
   }
@@ -971,6 +1137,7 @@ function cancelLoanEdit() {
 
 function deleteLoan(id) {
   loansData = loansData.filter(l => l.id !== id);
+  dbDelete('loans', id);
   saveData();
   renderLoansPage();
   renderRecurringTable();
@@ -1074,7 +1241,8 @@ function addCCTransaction() {
   if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
   if (!date)                        { toast('⚠️ Pick a date'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
-  ccTransactions.push({ id: Date.now(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type });
+  const newTxn = { id: Date.now(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type };
+  ccTransactions.push(newTxn); dbUpsert('cc_transactions', newTxn, toDbCCT);
   saveData(); renderCCTransactions(); toast(type === 'charge' ? '✅ Charge added!' : '✅ Payment recorded!');
   if (window.posthog) posthog.capture('cc_transaction_added', { type, category: cat });
   document.getElementById('cct-amount').value = '';
@@ -1083,6 +1251,7 @@ function addCCTransaction() {
 
 function deleteCCTransaction(id) {
   ccTransactions = ccTransactions.filter(t => t.id !== id);
+  dbDelete('cc_transactions', id);
   saveData(); renderCCTransactions(); renderOneoffList(); toast('🗑 Deleted');
 }
 
@@ -1103,6 +1272,8 @@ function saveCCTEdit(id) {
   if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
   ccTransactions = ccTransactions.map(t => t.id === id ? { ...t, date, cardId, category: cat, description: desc || cat, amount } : t);
+  const updatedTxn = ccTransactions.find(t => t.id === id);
+  if (updatedTxn) dbUpsert('cc_transactions', updatedTxn, toDbCCT);
   saveData(); editingCCTId = null; renderCCTransactions(); toast('✅ Updated!');
 }
 
@@ -1300,12 +1471,44 @@ function checkFirstVisit() {
 //  INIT
 // ══════════════════════════════════════════════════
 restoreDarkMode();
-checkFirstVisit();
 restoreSidebarState();
 restoreNavState();
 setDefaultDates();
 renderDashboard();
 renderOneoffList();
+
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await loadUserData();
+    document.getElementById('landing-overlay').classList.add('hidden');
+    updateUserUI();
+    renderDashboard();
+    renderOneoffList();
+  } else {
+    checkFirstVisit();
+  }
+
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN') {
+      currentUser = session.user;
+      await loadUserData();
+      const hasLocalData = ['mf_income','mf_expenses','mf_recurring'].some(k => {
+        try { return JSON.parse(localStorage.getItem(k) || '[]').length > 0; } catch(e) { return false; }
+      });
+      if (hasLocalData) showMigrationBanner();
+      document.getElementById('landing-overlay').classList.add('hidden');
+      updateUserUI();
+      renderDashboard();
+      renderOneoffList();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      updateUserUI();
+      window.location.reload();
+    }
+  });
+})();
 
 // Error telemetry
 window.onerror = function(msg, src, line, col, err) {

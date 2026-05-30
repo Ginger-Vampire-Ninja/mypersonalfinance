@@ -50,6 +50,7 @@
   </script>
 
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -70,18 +71,23 @@
         <text x="40" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5"><tspan fill="white">Fin</tspan><tspan fill="#2DD4BF">aura</tspan></text>
       </svg>
     </div>
-    <button class="lp-nav-cta" onclick="launchApp()">Launch App — Free</button>
+    <button class="lp-nav-cta" onclick="signInWithGoogle()">Sign in — Free</button>
   </nav>
 
   <div class="lp-hero">
-    <div class="lp-hero-badge">🔒 No account · No server · Free forever</div>
+    <div class="lp-hero-badge">🔒 Free forever · Sync across devices · No subscription</div>
     <h1>Take control of your <span>finances</span></h1>
-    <p>Track income, expenses, credit cards and loans. See your cashflow months ahead. Everything stays in your browser — no sign-up, no subscription, no data ever leaves your device.</p>
-    <div class="lp-cta-group">
-      <button class="lp-btn-primary" onclick="launchApp()">Launch App — It's Free</button>
-      <button class="lp-btn-secondary" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">See Features ↓</button>
+    <p>Track income, expenses, credit cards and loans. See your cashflow months ahead. Sign in with Google to sync across devices and keep your data safe — or use without an account.</p>
+    <div class="lp-auth-box">
+      <button class="btn-google-signin" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+      <div class="lp-auth-divider">or</div>
+      <button class="btn-continue-guest" onclick="launchApp()">Continue without account</button>
+      <p class="lp-auth-note">Sign in to sync across devices and protect against data loss</p>
     </div>
-    <p class="lp-privacy-note">🔒 Your data is stored only in your browser. We never see it.</p>
+    <button class="lp-btn-secondary" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">See Features ↓</button>
   </div>
 
   <div class="lp-features" id="lp-features">
@@ -122,24 +128,28 @@
   </div>
 
   <div class="lp-trust">
-    <h2>🔒 Your data never leaves your device</h2>
-    <p>Finaura stores everything in your browser's local storage. There is no server, no database, no account. We literally cannot see your financial data — even if we wanted to.</p>
+    <h2>🔒 Your privacy, your choice</h2>
+    <p>Use Finaura as a guest and your data never leaves your device — it lives entirely in your browser's local storage and we literally cannot see it. Sign in with Google and your data is securely stored in the cloud so it syncs across devices and survives cache clearing. Either way, there's no subscription and no selling your data.</p>
     <div class="lp-trust-pills">
-      <span class="lp-pill">✓ No sign-up required</span>
       <span class="lp-pill">✓ No subscription</span>
-<span class="lp-pill">✓ Financial data stays local</span>
-      <span class="lp-pill">✓ Works offline</span>
+      <span class="lp-pill">✓ Guest mode: data stays local</span>
+      <span class="lp-pill">✓ Signed in: syncs across devices</span>
+      <span class="lp-pill">✓ We never sell your data</span>
     </div>
   </div>
 
   <div class="lp-final-cta">
     <h2>Ready to take control?</h2>
-    <p>Free forever. No account needed. Start in seconds.</p>
-    <button class="lp-btn-primary" style="font-size:1.1rem;padding:16px 40px" onclick="launchApp()">Launch Finaura — Free</button>
+    <p>Free forever. No subscription. Start in seconds.</p>
+    <button class="btn-google-signin" style="max-width:300px;margin:0 auto" onclick="signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+      Sign in with Google — Free
+    </button>
+    <p style="margin-top:10px;font-size:0.82rem;color:rgba(255,255,255,0.4)">Or <button onclick="launchApp()" style="background:none;border:none;color:rgba(255,255,255,0.5);text-decoration:underline;cursor:pointer;font-size:0.82rem">continue without account</button></p>
   </div>
 
   <div class="lp-footer">
-    © 2025 Finaura. All rights reserved. · Built with ♥ · Data stays in your browser ·
+    © 2025 Finaura. All rights reserved. · Built with ♥ ·
     <a href="legal.html" style="color:#6b7280;text-decoration:underline;">Terms &amp; Privacy</a>
   </div>
 
@@ -147,6 +157,33 @@
 <!-- end landing overlay -->
 
 <div class="app">
+
+  <!-- Top-right account menu (shown when signed in) -->
+  <div class="account-menu" id="account-menu" style="display:none">
+    <div class="account-menu-btn" onclick="toggleAccountMenu()" id="account-menu-btn">
+      <span class="account-menu-avatar-placeholder" id="account-menu-avatar-placeholder">👤</span>
+      <span id="account-menu-name">Account</span>
+      <span style="font-size:0.65rem;color:#9ca3af;margin-left:2px">▾</span>
+    </div>
+    <div class="account-menu-dropdown" id="account-menu-dropdown">
+      <div class="account-menu-header">
+        <div class="account-menu-name" id="account-dropdown-name"></div>
+        <div class="account-menu-email" id="account-dropdown-email"></div>
+      </div>
+      <div class="account-menu-item-soon">
+        <span>🌍</span> Default currency
+        <span class="account-menu-soon-badge">Soon</span>
+      </div>
+      <div class="account-menu-item-soon">
+        <span>⚙️</span> Preferences
+        <span class="account-menu-soon-badge">Soon</span>
+      </div>
+      <div class="account-menu-divider"></div>
+      <div class="account-menu-item danger" onclick="signOut()">
+        <span>↩</span> Sign out
+      </div>
+    </div>
+  </div>
 
   <!-- Sidebar toggle -->
   <div class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</div>
@@ -214,11 +251,19 @@
       <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">
         <span id="dark-toggle-icon">🌙</span> <span id="dark-toggle-label">Dark mode</span>
       </button>
-      <div style="margin-top:10px">Data saved locally in your browser<br>© 2025 Finaura · <a href="legal.html" class="footer-link">Terms &amp; Privacy</a></div>
+      <div id="user-info" style="margin-top:10px"></div>
+      <div style="margin-top:8px;font-size:0.68rem">© 2025 Finaura · <a href="legal.html" class="footer-link">Terms &amp; Privacy</a></div>
     </div>
   </aside>
 
   <main class="main">
+
+    <!-- Migration banner -->
+    <div id="migration-banner" class="migration-banner">
+      <span>📦 You have existing data saved locally. Import it to your account to keep it safe?</span>
+      <button class="btn btn-primary" onclick="migrateFromLocalStorage()" style="padding:6px 16px;font-size:0.85rem">Import data</button>
+      <button class="btn-sm-ghost" onclick="dismissMigration()">Dismiss</button>
+    </div>
 
     <!-- ══════════ DASHBOARD ══════════ -->
     <section class="page active" id="page-dashboard">
