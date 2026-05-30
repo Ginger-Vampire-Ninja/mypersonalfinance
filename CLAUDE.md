@@ -4,7 +4,7 @@ This file provides guidance to Claude when working with code in this repository.
 
 ## Project overview
 
-Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1520 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (CDN), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
+Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1520 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
 
 Users can sign in with Google (data syncs to Supabase cloud DB) or use the app as a guest (data stays in `localStorage` only). Both modes work simultaneously — `saveData()` always writes to `localStorage`; `dbUpsert`/`dbDelete` additionally sync to Supabase when `currentUser` is set.
 
@@ -16,7 +16,8 @@ Users can sign in with Google (data syncs to Supabase cloud DB) or use the app a
 
 | File | Purpose |
 |---|---|
-| `index.html` | HTML shell — `<head>` with PostHog init, Supabase CDN, AdSense script, favicon; all `<section>` page markup; links to `styles.css` and `app.js` |
+| `index.html` | HTML shell — `<head>` with PostHog init, Supabase self-hosted script, AdSense script, favicon; all `<section>` page markup; links to `styles.css` and `app.js` |
+| `supabase.min.js` | Self-hosted Supabase JS v2 UMD bundle — served from same origin to bypass browser tracking prevention (Edge blocks CDN-loaded Supabase from accessing storage) |
 | `styles.css` | All app styles — layout, sidebar, cards, tables, forms, cashflow colours, landing overlay, auth box, account menu |
 | `app.js` | All JavaScript — data model, Supabase auth/data layer, navigation, render functions, event handlers, INIT |
 | `favicon.svg` | Browser tab icon — teal rounded square with white F letterform and mint sparkline |
@@ -45,7 +46,7 @@ git status
 
 The app is split into three files served by GitHub Pages:
 
-- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, Supabase JS CDN (`https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2`), Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (with `.lp-auth-box` Google sign-in UI), top-right `#account-menu` div, sidebar (with `#user-info` in footer), migration banner (`#migration-banner`), and all `<section class="page">` elements. Ends with `<script src="app.js"></script>` just before `</body>`. **PostHog, Supabase, and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
+- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, `<script src="supabase.min.js">` (self-hosted), Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (with `.lp-auth-box` Google sign-in UI), top-right `#account-menu` div, sidebar, migration banner (`#migration-banner`), and all `<section class="page">` elements. Ends with `<script src="app.js"></script>` just before `</body>`. **PostHog, Supabase, and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
 - **`styles.css`** — all styles. Teal sidebar (`#0F766E`), mint accent `#2DD4BF`, auth box (`lp-auth-box`), account menu (`.account-menu*`), migration banner, dark mode block (`html[data-theme="dark"] ...`), semantic colour utility classes.
 - **`app.js`** (~1520 lines) — all JS logic. Sections are marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
 
@@ -109,7 +110,7 @@ When signed in, a fixed `#account-menu` div appears at top-right of the page (`.
 - Preferences (Soon placeholder)
 - Sign out (danger style)
 
-`updateUserUI()` in `app.js` drives all of this. It also updates `#user-info` in the sidebar footer to show a small "✓ Firstname" confirmation. When signed out, the menu is hidden and the sidebar note is cleared.
+`updateUserUI()` in `app.js` drives all of this. When signed out, the menu is hidden.
 
 `toggleAccountMenu()` handles open/close, and `_closeAccountMenu()` is registered as a one-time `document` click listener to close on outside click.
 
