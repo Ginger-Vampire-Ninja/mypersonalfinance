@@ -7,9 +7,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .app.sidebar-collapsed .sidebar { transform: translateX(-230px); }
 .app.sidebar-collapsed .main { margin-left: 0; }
 /* Toggle button — always visible, floats at top-left */
-.sidebar-toggle { position: fixed; top: 14px; left: 14px; z-index: 200; background: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.3); color: #0F766E; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: left 0.25s ease, background 0.15s; user-select: none; }
-.sidebar-toggle:hover { background: #fff; color: #0D6560; }
-.app:not(.sidebar-collapsed) .sidebar-toggle { left: 196px; }
+.sidebar-toggle { position: fixed; top: 14px; left: 14px; z-index: 200; background: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.3); color: #0F766E; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: left 0.25s ease, background 0.15s; user-select: none; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.sidebar-toggle:hover { background: #fff; color: #0D6560; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.app:not(.sidebar-collapsed) .sidebar-toggle { left: 188px; }
 .sidebar-logo { padding: 20px 22px 16px; border-bottom: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; }
 .sidebar-logo svg { display: block; }
 .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
@@ -344,6 +344,16 @@ html[data-theme="dark"] .dash-trend-neg   { color: #f87171; }
 .account-menu-divider { height: 1px; background: #f1f5f9; margin: 2px 0; }
 .account-menu-item-soon { display: flex; align-items: center; gap: 9px; padding: 10px 16px; font-size: 0.85rem; color: #9ca3af; cursor: default; }
 .account-menu-soon-badge { font-size: 0.65rem; background: #f3f4f6; color: #9ca3af; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+.account-menu-currency { padding: 10px 16px; }
+.account-menu-currency-label { font-size: 0.78rem; color: #9ca3af; margin-bottom: 7px; }
+.account-menu-currency-options { display: flex; gap: 6px; }
+.currency-btn { flex: 1; padding: 5px 0; border: 1.5px solid #e5e7eb; border-radius: 7px; background: #f9fafb; color: #374151; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.currency-btn:hover { background: #f3f4f6; border-color: #0F766E; color: #0F766E; }
+.currency-btn.active { background: #0F766E; border-color: #0F766E; color: #fff; }
+html[data-theme="dark"] .account-menu-currency-label { color: #475569; }
+html[data-theme="dark"] .currency-btn { background: #1e293b; border-color: #334155; color: #cbd5e1; }
+html[data-theme="dark"] .currency-btn:hover { border-color: #2DD4BF; color: #2DD4BF; }
+html[data-theme="dark"] .currency-btn.active { background: #0F766E; border-color: #0F766E; color: #fff; }
 html[data-theme="dark"] .account-menu-btn { background: rgba(30,41,59,0.95); border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
 html[data-theme="dark"] .account-menu-dropdown { background: #1e293b; border-color: rgba(255,255,255,0.1); }
 html[data-theme="dark"] .account-menu-header { border-bottom-color: rgba(255,255,255,0.08); }

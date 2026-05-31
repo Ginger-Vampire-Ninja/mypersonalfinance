@@ -193,6 +193,7 @@ All state is module-level `let` variables, loaded from `localStorage` on startup
 | `mf_nav_state` | JSON `{overview, transactions, debt, planning, 'sub-creditcards', 'sub-loans': bool}` |
 | `mf_dark_mode` | `'dark'` or `'light'` |
 | `mf_migration_dismissed` | `'1'` once migration banner is dismissed — prevents it showing again |
+| `mf_currency` | `'GBP'`, `'USD'`, or `'EUR'` — selected display currency (defaults to GBP) |
 
 **IDs** are always `Date.now()` integers. **Dates** are always `YYYY-MM-DD` strings; always parse with `new Date(ds + 'T00:00:00')` to avoid timezone shifts.
 
