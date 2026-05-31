@@ -99,6 +99,67 @@ async function signOut() {
   await db.auth.signOut();
 }
 
+// ── Email auth helpers ──
+let _authMode = 'signin';
+
+function setAuthMode(mode) {
+  _authMode = mode;
+  const isSignUp = mode === 'signup';
+  document.getElementById('lp-auth-mode-title').textContent = isSignUp ? 'Create an account' : 'Sign in with email';
+  document.getElementById('lp-confirm-group').style.display  = isSignUp ? '' : 'none';
+  document.getElementById('lp-auth-submit').textContent      = isSignUp ? 'Create account' : 'Sign in';
+  document.getElementById('lp-auth-password-confirm')?.setAttribute('autocomplete', isSignUp ? 'new-password' : 'current-password');
+  document.getElementById('lp-mode-toggle').innerHTML = isSignUp
+    ? 'Already have an account? <button class="btn-link" onclick="setAuthMode(\'signin\')">Sign in</button>'
+    : 'Don\'t have an account? <button class="btn-link" onclick="setAuthMode(\'signup\')">Sign up</button>';
+  _clearAuthError();
+}
+
+function _showAuthError(msg) {
+  const el = document.getElementById('lp-auth-error');
+  if (el) { el.textContent = msg; el.style.display = ''; }
+}
+function _clearAuthError() {
+  const el = document.getElementById('lp-auth-error');
+  if (el) el.style.display = 'none';
+}
+
+async function submitEmailAuth() {
+  const email    = document.getElementById('lp-email')?.value.trim();
+  const password = document.getElementById('lp-password')?.value;
+  _clearAuthError();
+
+  if (!email || !password) { _showAuthError('Please enter your email and password.'); return; }
+
+  if (_authMode === 'signup') {
+    const confirm = document.getElementById('lp-password-confirm')?.value;
+    if (password !== confirm)  { _showAuthError('Passwords do not match.'); return; }
+    if (password.length < 6)   { _showAuthError('Password must be at least 6 characters.'); return; }
+
+    const { error } = await db.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: 'https://finaura.app' }
+    });
+    if (error) { _showAuthError(error.message); return; }
+
+    // Show confirmation prompt — user must verify email before accessing app
+    const box = document.getElementById('lp-auth-box');
+    if (box) box.innerHTML = `
+      <div class="lp-auth-confirm">
+        <div style="font-size:2.2rem">📧</div>
+        <p>Check your inbox</p>
+        <p class="lp-auth-note">A confirmation link has been sent to <strong style="color:rgba(255,255,255,0.75)">${email}</strong>.<br>Click it to activate your account, then sign in.</p>
+        <button class="btn-continue-guest" onclick="location.reload()" style="margin-top:6px">Back to sign in</button>
+      </div>`;
+  } else {
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      _showAuthError(error.message === 'Invalid login credentials'
+        ? 'Incorrect email or password.' : error.message);
+    }
+  }
+}
+
 // ── Account menu UI ──
 function updateUserUI() {
   const menuEl = document.getElementById('account-menu');

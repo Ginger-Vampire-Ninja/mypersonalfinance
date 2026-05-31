@@ -322,6 +322,20 @@ html[data-theme="dark"] .dash-trend-neg   { color: #f87171; }
 .btn-continue-guest { background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 10px 20px; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.15s; width: 100%; }
 .btn-continue-guest:hover { color: #fff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.06); }
 .lp-auth-note { font-size: 0.78rem; color: rgba(255,255,255,0.4); text-align: center; }
+.lp-email-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.lp-email-form-header { font-size: 0.78rem; color: rgba(255,255,255,0.5); text-align: center; margin-bottom: 2px; }
+.lp-input { width: 100%; padding: 10px 13px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 9px; color: #fff; font-size: 0.9rem; outline: none; transition: border-color 0.15s; }
+.lp-input::placeholder { color: rgba(255,255,255,0.35); }
+.lp-input:focus { border-color: #2DD4BF; background: rgba(255,255,255,0.1); }
+.btn-email-auth { width: 100%; padding: 11px; background: #0F766E; color: #fff; border: none; border-radius: 10px; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btn-email-auth:hover { background: #0D6560; }
+.lp-auth-mode-toggle { font-size: 0.78rem; color: rgba(255,255,255,0.45); text-align: center; margin: 0; }
+.btn-link { background: none; border: none; color: #2DD4BF; font-size: 0.78rem; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+.btn-link:hover { color: #5eead4; }
+.lp-auth-error { font-size: 0.78rem; color: #f87171; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.3); border-radius: 7px; padding: 8px 12px; text-align: center; }
+.lp-auth-confirm { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 0; text-align: center; }
+.lp-auth-confirm p { color: rgba(255,255,255,0.8); font-size: 0.9rem; font-weight: 600; margin: 0; }
+.lp-auth-confirm .lp-auth-note { color: rgba(255,255,255,0.45); }
 
 /* ── Migration banner ── */
 .migration-banner { display: none; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; font-size: 0.88rem; color: #92400e; }
