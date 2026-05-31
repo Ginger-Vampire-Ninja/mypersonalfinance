@@ -1,0 +1,12 @@
+{
+  "name": "finaura-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
