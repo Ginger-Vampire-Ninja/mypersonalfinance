@@ -51,7 +51,7 @@ function fromDbDeal(d)      { return { id: d.id, cardId: d.card_id, amount: pars
 function toDbCCT(t)         { return { id: t.id, card_id: t.cardId, date: t.date, amount: t.amount, category: t.category, description: t.description || null, type: t.type }; }
 function fromDbCCT(t)       { return { id: t.id, cardId: t.card_id, date: t.date, amount: parseFloat(t.amount), category: t.category, description: t.description, type: t.type || 'charge' }; }
 function toDbLoan(l)        { return { id: l.id, lender: l.lender, total_amount: l.totalAmount, repayment_amount: l.repaymentAmount, apr: l.apr || null, frequency: l.frequency, start_date: l.startDate, end_date: l.endDate || null, note: l.note || null }; }
-function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: parseFloat(l.totalAmount), repaymentAmount: parseFloat(l.repaymentAmount), apr: l.apr ? parseFloat(l.apr) : null, frequency: l.frequency, startDate: l.start_date, endDate: l.end_date, note: l.note }; }
+function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: parseFloat(l.total_amount), repaymentAmount: parseFloat(l.repayment_amount), apr: l.apr ? parseFloat(l.apr) : null, frequency: l.frequency, startDate: l.start_date, endDate: l.end_date, note: l.note }; }
 
 // ── Generic DB helpers ──
 async function dbUpsert(table, jsObj, toDbFn) {
@@ -122,6 +122,7 @@ function updateUserUI() {
     const ddEmail = document.getElementById('account-dropdown-email');
     if (ddName)  ddName.textContent  = name;
     if (ddEmail) ddEmail.textContent = email;
+    updateCurrencyUI();
   } else {
     menuEl.style.display = 'none';
   }
@@ -211,8 +212,34 @@ function navigate(page) {
 // ══════════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════════
-function fmt(n)  { return '£' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+const CURRENCIES = {
+  GBP: { symbol: '£', label: '£ GBP', flag: '🇬🇧' },
+  USD: { symbol: '$', label: '$ USD', flag: '🇺🇸' },
+  EUR: { symbol: '€', label: '€ EUR', flag: '🇪🇺' },
+};
+let currentCurrency = localStorage.getItem('mf_currency') || 'GBP';
+
+function fmt(n)  { return CURRENCIES[currentCurrency].symbol + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function fmtS(n) { return (n < 0 ? '-' : '+') + fmt(n); }
+
+function setCurrency(code) {
+  if (!CURRENCIES[code]) return;
+  currentCurrency = code;
+  localStorage.setItem('mf_currency', code);
+  updateCurrencyUI();
+  // Re-render the active page so all amounts update immediately
+  const active = document.querySelector('.page.active');
+  if (active) {
+    const page = active.id.replace('page-', '');
+    navigate(page);
+  }
+}
+
+function updateCurrencyUI() {
+  document.querySelectorAll('.currency-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.code === currentCurrency);
+  });
+}
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 
 function toast(msg) {
@@ -1376,12 +1403,25 @@ function toggleSidebar() {
   const app = document.querySelector('.app');
   const isNowCollapsed = app.classList.toggle('sidebar-collapsed');
   localStorage.setItem('mf_sidebar_collapsed', isNowCollapsed ? '1' : '0');
+  _updateSidebarToggleIcon(isNowCollapsed);
+}
+
+function _updateSidebarToggleIcon(collapsed) {
+  const icon = document.getElementById('sidebar-toggle-icon');
+  if (!icon) return;
+  if (collapsed) {
+    // Show chevron-right (expand)
+    icon.innerHTML = `<polyline points="6,4 14,10 6,16"/>`;
+  } else {
+    // Show hamburger (collapse)
+    icon.innerHTML = `<line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>`;
+  }
 }
 
 function restoreSidebarState() {
-  if (localStorage.getItem('mf_sidebar_collapsed') === '1') {
-    document.querySelector('.app').classList.add('sidebar-collapsed');
-  }
+  const collapsed = localStorage.getItem('mf_sidebar_collapsed') === '1';
+  if (collapsed) document.querySelector('.app').classList.add('sidebar-collapsed');
+  _updateSidebarToggleIcon(collapsed);
 }
 
 function toggleNavGroup(key) {
@@ -1467,6 +1507,7 @@ function checkFirstVisit() {
 restoreDarkMode();
 restoreSidebarState();
 restoreNavState();
+updateCurrencyUI();
 setDefaultDates();
 renderDashboard();
 renderOneoffList();
