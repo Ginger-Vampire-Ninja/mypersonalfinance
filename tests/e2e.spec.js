@@ -6,6 +6,7 @@
 // ══════════════════════════════════════════════════
 const { test, expect } = require('@playwright/test');
 const { createClient }  = require('@supabase/supabase-js');
+const ws               = require('ws');
 
 const SUPABASE_URL  = 'https://acqiduorpzwwegzaijdc.supabase.co';
 const SUPABASE_KEY  = 'sb_publishable_BNdn9Z-B74oF3XrRZlu-Rw_ePCyaU2f';
@@ -25,7 +26,9 @@ let testCardId; // card created in beforeAll, used by deal + CC txn tests
 test.beforeAll(async () => {
   if (!TEST_PASSWORD) throw new Error('TEST_USER_PASSWORD env var is not set');
 
-  client = createClient(SUPABASE_URL, SUPABASE_KEY);
+  client = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    realtime: { transport: ws }
+  });
   const { data, error } = await client.auth.signInWithPassword({
     email:    TEST_EMAIL,
     password: TEST_PASSWORD,
