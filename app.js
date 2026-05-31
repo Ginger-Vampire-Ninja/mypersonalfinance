@@ -73,7 +73,7 @@ async function loadUserData() {
     db.from('expenses').select('*').eq('user_id', uid),
     db.from('recurring').select('*').eq('user_id', uid),
     db.from('credit_cards').select('*').eq('user_id', uid),
-    db.from('interest_free_deals').select('*').eq('user_id', uid),
+    db.from('promo_deals').select('*').eq('user_id', uid),
     db.from('cc_transactions').select('*').eq('user_id', uid),
     db.from('loans').select('*').eq('user_id', uid),
   ]);
@@ -169,7 +169,7 @@ async function migrateFromLocalStorage() {
     if (lsIncome.length)    await db.from('income').upsert(lsIncome.map(r => ({ ...toDbIncome(r), user_id: uid })));
     if (lsExpenses.length)  await db.from('expenses').upsert(lsExpenses.map(r => ({ ...toDbIncome(r), user_id: uid })));
     if (lsRecurring.length) await db.from('recurring').upsert(lsRecurring.map(r => ({ ...toDbRecurring(r), user_id: uid })));
-    if (lsDeals.length)     await db.from('interest_free_deals').upsert(lsDeals.map(d => ({ ...toDbDeal(d), user_id: uid })));
+    if (lsDeals.length)     await db.from('promo_deals').upsert(lsDeals.map(d => ({ ...toDbDeal(d), user_id: uid })));
     if (lsCCT.length)       await db.from('cc_transactions').upsert(lsCCT.map(t => ({ ...toDbCCT(t), user_id: uid })));
     if (lsLoans.length)     await db.from('loans').upsert(lsLoans.map(l => ({ ...toDbLoan(l), user_id: uid })));
     ['mf_income','mf_expenses','mf_recurring','mf_cards','mf_deals','mf_cc_transactions','mf_loans'].forEach(k => localStorage.removeItem(k));
@@ -804,7 +804,7 @@ function editCard(id) {
 function deleteCard(id) {
   if (interestFreeDeals.some(d=>d.cardId===id)) {
     if (!confirm('This card has interest-free deals linked to it. Deleting the card will also remove those deals. Continue?')) return;
-    interestFreeDeals.filter(d=>d.cardId===id).forEach(d => dbDelete('interest_free_deals', d.id));
+    interestFreeDeals.filter(d=>d.cardId===id).forEach(d => dbDelete('promo_deals', d.id));
     interestFreeDeals=interestFreeDeals.filter(d=>d.cardId!==id);
   }
   creditCards=creditCards.filter(c=>c.id!==id);
@@ -966,7 +966,7 @@ function saveDeal() {
   const deal = { id: editId ? parseInt(editId) : Date.now(), cardId, amount, startDate: start, endDate: end, note };
   if (editId) interestFreeDeals = interestFreeDeals.map(d => d.id === deal.id ? deal : d);
   else        interestFreeDeals.push(deal);
-  dbUpsert('interest_free_deals', deal, toDbDeal);
+  dbUpsert('promo_deals', deal, toDbDeal);
   saveData(); clearDealForm(); renderDealsPage(); toast(editId ? '✅ Deal updated!' : '✅ Deal saved!');
 }
 
@@ -999,7 +999,7 @@ function editDeal(id) {
 
 function deleteDeal(id) {
   interestFreeDeals = interestFreeDeals.filter(d => d.id !== id);
-  dbDelete('interest_free_deals', id);
+  dbDelete('promo_deals', id);
   saveData(); renderDealsPage(); toast('🗑 Deal deleted');
 }
 
