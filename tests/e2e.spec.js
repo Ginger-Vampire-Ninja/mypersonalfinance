@@ -229,3 +229,150 @@ test('loan syncs to DB', async ({ page }) => {
   expect(data).toHaveLength(1);
   expect(parseFloat(data[0].total_amount)).toBe(10000);
 });
+
+// ══════════════════════════════════════════════════
+//  Dashboard & Cashflow Calculation Tests
+//
+//  These tests verify that the app correctly calculates
+//  and displays figures across all transaction types.
+//
+//  Known test data inserted via API (not UI):
+//    - Recurring income:  £3,000/month
+//    - Recurring expense: £800/month
+//    - One-off income:    £500
+//    - One-off expense:   £200
+//    - Credit card:       £1,000 balance, 24% APR, 2% min (£25 floor)
+//    - CC charge:         £100 this month
+//    - CC payment:        £50  this month
+//    - Loan repayment:    £200/month
+//
+//  Expected dashboard:
+//    income = £500, expenses = £200, balance = £300, rec net = +£2,200
+//
+//  Expected cashflow month 1:
+//    recInc=£3,000 | recExp=£1,000 | oneOffInc=£500
+//    oneOffExp=£250 (£200 + £50 CC payment) | ccMin=£25
+//    net = £2,225 | card balance after = £1,046
+// ══════════════════════════════════════════════════
+test.describe('Dashboard and Cashflow calculations', () => {
+  const today = new Date().toISOString().split('T')[0];
+  let calcCardId;
+
+  test.beforeAll(async () => {
+    // Clear ALL test user data so previous sync tests don't affect figures
+    await Promise.all([
+      client.from('income').delete().eq('user_id', testUserId),
+      client.from('expenses').delete().eq('user_id', testUserId),
+      client.from('recurring').delete().eq('user_id', testUserId),
+      client.from('promo_deals').delete().eq('user_id', testUserId),
+      client.from('cc_transactions').delete().eq('user_id', testUserId),
+      client.from('credit_cards').delete().eq('user_id', testUserId),
+      client.from('loans').delete().eq('user_id', testUserId),
+    ]);
+
+    const base = Date.now();
+    calcCardId = base;
+
+    // Insert card first (FK dependency for CC transactions)
+    const { error: cardErr } = await client.from('credit_cards').insert({
+      id: calcCardId, user_id: testUserId, name: 'Calc Test Card',
+      balance: 1000, apr: 24, min_type: 'percent', min_pct: 2, min_floor: 25, min_fixed: null,
+    });
+    if (cardErr) throw new Error('Failed to insert calc card: ' + cardErr.message);
+
+    const inserts = await Promise.all([
+      client.from('recurring').insert({ id: base+1, user_id: testUserId, type: 'income',
+        name: 'Calc Salary', category: 'Salary', amount: 3000, frequency: 'monthly',
+        start_date: today, end_date: null }),
+      client.from('recurring').insert({ id: base+2, user_id: testUserId, type: 'expense',
+        name: 'Calc Rent', category: 'Housing', amount: 800, frequency: 'monthly',
+        start_date: today, end_date: null }),
+      client.from('income').insert({ id: base+3, user_id: testUserId,
+        date: today, category: 'Bonus', amount: 500, description: 'Calc One-off Income' }),
+      client.from('expenses').insert({ id: base+4, user_id: testUserId,
+        date: today, category: 'Other', amount: 200, description: 'Calc One-off Expense' }),
+      client.from('cc_transactions').insert({ id: base+5, user_id: testUserId,
+        card_id: calcCardId, date: today, amount: 100, category: 'Shopping',
+        description: 'Calc CC Charge', type: 'charge' }),
+      client.from('cc_transactions').insert({ id: base+6, user_id: testUserId,
+        card_id: calcCardId, date: today, amount: 50, category: 'CC Payment',
+        description: 'Calc CC Payment', type: 'payment' }),
+      client.from('loans').insert({ id: base+7, user_id: testUserId,
+        lender: 'Calc Bank', total_amount: 5000, repayment_amount: 200,
+        apr: null, frequency: 'monthly', start_date: today, end_date: null, note: null }),
+    ]);
+
+    const failed = inserts.find(r => r.error);
+    if (failed) throw new Error('Failed to insert calc test data: ' + failed.error.message);
+  });
+
+  test('dashboard totals are correct across all transaction types', async ({ page }) => {
+    await loadApp(page);
+    await page.waitForSelector('#dash-income', { state: 'visible' });
+
+    const income       = await page.$eval('#dash-income',        el => el.textContent.trim());
+    const expenses     = await page.$eval('#dash-expenses',      el => el.textContent.trim());
+    const balance      = await page.$eval('#dash-balance',       el => el.textContent.trim());
+    const recurringNet = await page.$eval('#dash-recurring-net', el => el.textContent.trim());
+
+    expect(income).toBe('£500.00');         // one-off income only
+    expect(expenses).toBe('£200.00');       // one-off expense only (CC payments excluded)
+    expect(balance).toBe('£300.00');        // 500 - 200
+    expect(recurringNet).toBe('+£2,200.00'); // 3,000 - 800 (loans not in recurring net KPI)
+  });
+
+  test('cashflow month 1 is correct including recurring, one-offs, CC and loan', async ({ page }) => {
+    await loadApp(page);
+    await page.evaluate(() => navigate('cashflow'));
+    await page.waitForSelector('#cf-table-body tr', { state: 'visible' });
+
+    const row = await page.$eval('#cf-table-body tr:first-child', tr => {
+      const cells = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.replace(/\s+/g, '').trim());
+      return {
+        recInc:    cells[1],  // Rec. Income
+        oneOffInc: cells[2],  // One-off Inc.
+        recExp:    cells[3],  // Rec. Expenses (includes loan repayment)
+        oneOffExp: cells[4],  // One-off Exp. (includes CC payment cash outflow)
+        ccMin:     cells[5],  // CC Payments (minimum payment after interest)
+        net:       cells[6],  // Net Cashflow
+        running:   cells[7],  // Running Total
+      };
+    });
+
+    // Recurring income: £3,000/month salary
+    expect(row.recInc).toBe('£3,000.00');
+
+    // One-off income: £500
+    expect(row.oneOffInc).toBe('£500.00');
+
+    // Recurring expenses: £800 recurring + £200 loan = £1,000
+    expect(row.recExp).toBe('£1,000.00');
+
+    // One-off expenses: £200 (expense) + £50 (CC payment cash outflow) = £250
+    expect(row.oneOffExp).toBe('£250.00');
+
+    // CC minimum payment:
+    //   balance 1,000 + 100 (charge) - 50 (payment) = 1,050
+    //   interest = 1,050 × 24%/12 = 21 → balance = 1,071
+    //   min = max(1,071 × 2%, 25) = 25
+    expect(row.ccMin).toBe('£25.00');
+
+    // Net = 3,000 + 500 - 1,000 - 250 - 25 = £2,225
+    expect(row.net).toBe('+£2,225.00');
+
+    // Running total = net (first month)
+    expect(row.running).toBe('+£2,225.00');
+  });
+
+  test('cashflow card tracker shows correct balance after CC activity and interest', async ({ page }) => {
+    await loadApp(page);
+    await page.evaluate(() => navigate('cashflow'));
+    await page.waitForSelector('#cf-card-tracker-panel', { state: 'visible' });
+
+    // Month 1 card balance: 1,000 + 100 (charge) - 50 (payment) + 21 (interest) - 25 (min) = £1,046
+    const cardBalance = await page.$eval('#cf-card-tracker-table tbody tr:first-child td:nth-child(2)',
+      el => el.textContent.trim());
+
+    expect(cardBalance).toBe('£1,046.00');
+  });
+});
