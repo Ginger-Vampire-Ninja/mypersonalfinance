@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude when working with code in this repository.
 
+> **Standing instruction:** After completing any code change, always consider whether `tests/e2e.spec.js` needs updating. Specifically: if a new data type or Supabase table is added, a new test block is needed. If a form field ID, button selector, or table name changes, the relevant test must be updated to match. If a mutation function is added or renamed, check whether it's covered. Raise this proactively — don't wait to be asked.
+
 ## Project overview
 
 Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1520 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
@@ -25,8 +27,14 @@ Users can sign in with Google (data syncs to Supabase cloud DB) or use the app a
 | `og-image.svg` | 1200×630 Open Graph image for social sharing previews |
 | `sitemap.xml` | XML sitemap submitted to Google Search Console |
 | `robots.txt` | Allows all crawlers, points to sitemap |
+| `ads.txt` | Google AdSense verification file |
 | `CNAME` | Custom domain config (`finaura.app`) for GitHub Pages |
 | `CLAUDE.md` | This file |
+| `package.json` | Dev dependencies for E2E tests (Playwright, Supabase JS, ws) |
+| `playwright.config.js` | Playwright configuration — targets `https://finaura.app`, chromium only |
+| `tests/e2e.spec.js` | E2E DB sync tests — signs in as test user, adds data via UI, verifies rows in Supabase |
+| `.github/workflows/e2e.yml` | GitHub Actions workflow — runs E2E tests after every Pages deploy or manual trigger |
+| `.gitignore` | Excludes `node_modules/`, `playwright-report/`, `test-results/` |
 
 ## Git workflow
 
@@ -90,7 +98,7 @@ let currentUser = null;
 | `expenses` | `toDbIncome` / `fromDbIncome` (same shape) |
 | `recurring` | `toDbRecurring` / `fromDbRecurring` (`startDate` ↔ `start_date`, `endDate` ↔ `end_date`) |
 | `credit_cards` | `toDbCard` / `fromDbCard` (`minType` ↔ `min_type`, etc.) |
-| `interest_free_deals` | `toDbDeal` / `fromDbDeal` (`cardId` ↔ `card_id`) |
+| `promo_deals` | `toDbDeal` / `fromDbDeal` (`cardId` ↔ `card_id`) — renamed from `interest_free_deals` to avoid ad blocker URL blocking |
 | `cc_transactions` | `toDbCCT` / `fromDbCCT` (`cardId` ↔ `card_id`) |
 | `loans` | `toDbLoan` / `fromDbLoan` (`totalAmount` ↔ `total_amount`, etc.) |
 
@@ -288,6 +296,35 @@ Sidebar teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 | INIT | 1435 |
 
 Use `grep -n "^//  "` on `app.js` to find the current line of any section quickly (double-space after `//`).
+
+## E2E regression tests
+
+Playwright tests live in `tests/e2e.spec.js` and verify that every data type syncs correctly from the UI to Supabase after a deploy.
+
+**Test user:** `test@finaura.app` (email/password auth in Supabase, confirmed via SQL). Password stored as `TEST_USER_PASSWORD` GitHub secret.
+
+**How tests work:**
+1. Sign in programmatically via Supabase `signInWithPassword`
+2. Inject the session into `localStorage` (`sb-acqiduorpzwwegzaijdc-auth-token`) before page load using `page.addInitScript`
+3. Navigate to `https://finaura.app` — app detects session and skips landing overlay
+4. Interact with each page's form to add a test record
+5. Query Supabase directly to assert the row exists with correct values
+6. `afterAll` deletes all rows for the test user so the DB stays clean
+
+**Tables covered:** `income`, `expenses`, `recurring`, `credit_cards`, `promo_deals`, `cc_transactions`, `loans`
+
+**A prerequisite credit card** (`E2E Prereq Card`) is inserted directly via the Supabase API in `beforeAll` so the promo deal and CC transaction tests don't depend on the credit card UI test passing first.
+
+**Running locally:**
+```bash
+npm install
+npx playwright install chromium
+TEST_USER_PASSWORD=xxx npm run test:e2e
+```
+
+**CI trigger:** `deployment_status` event (fires after every successful GitHub Pages deploy) plus `workflow_dispatch` for manual runs. The `deployment_status` event fires multiple times per deploy — only the `state == 'success'` event runs the job; others are skipped. This causes multiple workflow entries in the Actions tab which is expected.
+
+**Important:** `promo_deals` was renamed from `interest_free_deals` — ad blockers (McAfee WebAdvisor etc.) block HTTP requests whose URL contains "interest", silently preventing Supabase upserts. Always avoid table/field names containing financial ad-targeting keywords (`interest`, `free`, `deal`, `offer`) in Supabase table names used from the browser.
 
 ## Efficient editing approach
 
