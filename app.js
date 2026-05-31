@@ -395,7 +395,7 @@ function generateProjection(numMonths) {
     });
     // Loan repayments treated as recurring expenses
     loansData.forEach(loan => {
-      const loanItem = { frequency: loan.frequency, startDate: loan.startDate, endDate: loan.endDate || null };
+      const loanItem = { frequency: loan.frequency, startDate: loan.startDate, endDate: loan.endDate || null, amount: loan.repaymentAmount };
       const amt = getAmountForMonth(loanItem, yr, mo);
       if (amt > 0) { recExp += amt; expItems.push({ name: loan.lender + ' (loan)', amount: amt }); }
     });
