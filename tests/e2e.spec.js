@@ -284,7 +284,7 @@ test('savings transfer syncs to DB', async ({ page }) => {
   await page.selectOption('#acc-transfer-from', { value: String(testCurrentAccId) });
   await page.selectOption('#acc-transfer-to',   { value: String(testSavingsAccId) });
   await page.fill('#acc-transfer-amount', '200');
-  await page.selectOption('#acc-transfer-freq', { value: 'monthly' });
+  await page.selectOption('#acc-transfer-frequency', { value: 'monthly' });
   await page.fill('#acc-transfer-start', new Date().toISOString().split('T')[0]);
   await page.click('button[onclick="saveTransfer()"]');
 
