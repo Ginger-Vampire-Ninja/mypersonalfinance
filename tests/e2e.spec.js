@@ -272,7 +272,7 @@ test('savings transfer syncs to DB', async ({ page }) => {
   await page.waitForSelector('#acc-name', { state: 'visible' });
 
   // Switch to Transfers tab so the from/to selects are populated
-  await page.click('button[onclick="switchAccountTab(\'transfers\')"]');
+  await page.click('#page-accounts .tab:has-text("Transfers")');
   await page.waitForSelector('#acc-transfer-from', { state: 'visible' });
 
   // Wait for the prereq accounts to populate the dropdowns
