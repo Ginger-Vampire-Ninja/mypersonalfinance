@@ -1897,21 +1897,12 @@ renderOneoffList();
 
 (async () => {
   if (!db) { checkFirstVisit(); return; }
-  const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    _applyCurrencyFromUser(currentUser);
-    await loadUserData();
-    document.getElementById('landing-overlay').classList.add('hidden');
-    updateUserUI();
-    renderDashboard();
-    renderOneoffList();
-  } else {
-    checkFirstVisit();
-  }
 
+  // Register listener FIRST so OAuth callback events (SIGNED_IN fired while
+  // getSession() processes the #access_token hash) are never missed.
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
+      if (currentUser?.id === session?.user?.id) return; // already handled by getSession() path
       currentUser = session.user;
       _applyCurrencyFromUser(currentUser);
       await loadUserData();
@@ -1929,6 +1920,22 @@ renderOneoffList();
       window.location.reload();
     }
   });
+
+  // Handle returning users (page refresh with existing session in localStorage).
+  // For fresh OAuth callbacks the listener above will have already run by the
+  // time getSession() resolves, so we guard with !currentUser.
+  const { data: { session } } = await db.auth.getSession();
+  if (session && !currentUser) {
+    currentUser = session.user;
+    _applyCurrencyFromUser(currentUser);
+    await loadUserData();
+    document.getElementById('landing-overlay').classList.add('hidden');
+    updateUserUI();
+    renderDashboard();
+    renderOneoffList();
+  } else if (!session && !currentUser) {
+    checkFirstVisit();
+  }
 })();
 
 // Error telemetry
