@@ -1898,11 +1898,10 @@ renderOneoffList();
 (async () => {
   if (!db) { checkFirstVisit(); return; }
 
-  // Register listener FIRST so OAuth callback events (SIGNED_IN fired while
-  // getSession() processes the #access_token hash) are never missed.
+  // Register BEFORE getSession() so OAuth SIGNED_IN events (fired while
+  // Supabase processes the #access_token hash during getSession) are never missed.
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
-      if (currentUser?.id === session?.user?.id) return; // already handled by getSession() path
       currentUser = session.user;
       _applyCurrencyFromUser(currentUser);
       await loadUserData();
@@ -1921,11 +1920,11 @@ renderOneoffList();
     }
   });
 
-  // Handle returning users (page refresh with existing session in localStorage).
-  // For fresh OAuth callbacks the listener above will have already run by the
-  // time getSession() resolves, so we guard with !currentUser.
+  // Also handle existing sessions (page refresh / returning user).
+  // If the onAuthStateChange SIGNED_IN path already ran, this is a harmless
+  // second loadUserData call — data re-fetches cleanly.
   const { data: { session } } = await db.auth.getSession();
-  if (session && !currentUser) {
+  if (session) {
     currentUser = session.user;
     _applyCurrencyFromUser(currentUser);
     await loadUserData();
@@ -1933,7 +1932,7 @@ renderOneoffList();
     updateUserUI();
     renderDashboard();
     renderOneoffList();
-  } else if (!session && !currentUser) {
+  } else {
     checkFirstVisit();
   }
 })();
