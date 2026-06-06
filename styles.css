@@ -317,6 +317,8 @@ html[data-theme="dark"] .dash-trend-neg   { color: #f87171; }
 .lp-auth-box { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 28px 32px; max-width: 420px; margin: 0 auto 16px; display: flex; flex-direction: column; gap: 14px; }
 .btn-google-signin { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 20px; background: #fff; color: #1f2937; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
 .btn-google-signin:hover { background: #f3f4f6; box-shadow: 0 3px 10px rgba(0,0,0,0.22); }
+.btn-github-signin { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 20px; background: #24292e; color: #fff; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.28); }
+.btn-github-signin:hover { background: #1a1e22; box-shadow: 0 3px 10px rgba(0,0,0,0.35); }
 .lp-auth-divider { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,0.35); font-size: 0.82rem; }
 .lp-auth-divider::before, .lp-auth-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.14); }
 .btn-continue-guest { background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 10px 20px; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.15s; width: 100%; }
