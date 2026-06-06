@@ -2,6 +2,16 @@
 
 ---
 
+## v2.1.0 — GitHub Sign-In
+*Released: June 2026*
+
+### ✨ New Features
+
+**GitHub Sign-In**
+Users can now sign in with their GitHub account as an alternative to Google or email/password. The GitHub button appears on the landing page auth box alongside the existing options.
+
+---
+
 ## v2.0.0 — Cloud Sync & Account Features
 *Released: 31 May 2026*
 

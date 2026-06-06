@@ -94,6 +94,13 @@ async function signInWithGoogle() {
   });
   if (error) toast('⚠️ Sign in failed: ' + error.message);
 }
+async function signInWithGitHub() {
+  const { error } = await db.auth.signInWithOAuth({
+    provider: 'github',
+    options: { redirectTo: 'https://finaura.app' }
+  });
+  if (error) toast('⚠️ Sign in failed: ' + error.message);
+}
 async function signOut() {
   document.getElementById('account-menu-dropdown')?.classList.remove('open');
   await db.auth.signOut();

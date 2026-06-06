@@ -8,7 +8,7 @@ This file provides guidance to Claude when working with code in this repository.
 
 Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1520 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
 
-Users can sign in with Google (data syncs to Supabase cloud DB) or use the app as a guest (data stays in `localStorage` only). Both modes work simultaneously — `saveData()` always writes to `localStorage`; `dbUpsert`/`dbDelete` additionally sync to Supabase when `currentUser` is set.
+Users can sign in with Google or GitHub (data syncs to Supabase cloud DB) or use the app as a guest (data stays in `localStorage` only). Both modes work simultaneously — `saveData()` always writes to `localStorage`; `dbUpsert`/`dbDelete` additionally sync to Supabase when `currentUser` is set.
 
 **Important:** Google AdSense is loaded conditionally via a dynamic `<script>` injection guarded by `location.hostname === 'finaura.app'`. Do not revert this to a static `<script async src="...">` tag — AdSense contains an infinite loop that hangs the page on `file://` URLs (local dev).
 
@@ -85,7 +85,7 @@ let currentUser = null;
 ```
 
 **Auth flow:**
-1. `signInWithGoogle()` — calls `db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://finaura.app' } })`. Redirects away to Google then back.
+1. `signInWithGoogle()` / `signInWithGitHub()` — calls `db.auth.signInWithOAuth({ provider: 'google'|'github', options: { redirectTo: 'https://finaura.app' } })`. Redirects away then back.
 2. On return, `db.auth.onAuthStateChange` fires `SIGNED_IN`. `loadUserData()` fetches all tables, replaces in-memory arrays, re-renders.
 3. On sign-out (`signOut()`), `SIGNED_OUT` fires and the page reloads (cleanest way to reset in-memory state).
 4. On page load, `db.auth.getSession()` checks for an active session (e.g. returning user with valid cookie). If found, data is loaded and the landing overlay is skipped. `checkFirstVisit()` is only called when no session exists.
@@ -266,6 +266,7 @@ Sidebar teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 - `lp-*` — landing page overlay only
 - `.lp-auth-box` — hero sign-in card (dark glass style matching landing overlay)
 - `.btn-google-signin` — white Google button (follows Google branding guidelines)
+- `.btn-github-signin` — dark GitHub button (`#24292e` background, white text/icon)
 - `.btn-continue-guest` — ghost button for no-account path
 - `.migration-banner` — amber banner shown post sign-in when localStorage data exists
 - `.account-menu` / `.account-menu-btn` / `.account-menu-dropdown` — fixed top-right account dropdown (has dark mode overrides)
