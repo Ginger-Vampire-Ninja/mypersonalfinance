@@ -245,6 +245,7 @@
         <div class="nav-section" onclick="toggleNavGroup('overview')">Overview <span class="nav-dot"></span></div>
         <div class="nav-group-items">
           <div class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</div>
+          <div class="nav-item" onclick="navigate('accounts')"><span class="icon">💰</span> Accounts</div>
         </div>
       </div>
 
@@ -482,6 +483,11 @@
         <div class="panel-title">Credit Card Balance Tracker</div>
         <p style="font-size:0.82rem;color:#888;margin-bottom:14px">Projected balance after minimum payments. <span class="zero-pct-tag">0%</span> shows when an interest-free deal is active.</p>
         <div class="table-wrap"><table class="cf-table" id="cf-card-tracker-table"></table></div>
+      </div>
+      <div class="panel" id="cf-savings-tracker-panel" style="display:none">
+        <div class="panel-title">Savings Account Projections</div>
+        <p style="font-size:0.82rem;color:#888;margin-bottom:14px">Projected savings balance including planned transfers and monthly compound interest.</p>
+        <div class="table-wrap"><table class="cf-table" id="cf-savings-tracker-table"></table></div>
       </div>
     </section>
 
@@ -757,6 +763,88 @@
             <thead><tr><th>Lender</th><th>Total Amount</th><th>Repayment</th><th>Frequency</th><th>APR</th><th>Start Date</th><th>End Date</th><th>Note</th><th></th></tr></thead>
             <tbody id="loans-table-body"><tr><td colspan="9" class="empty-state">No loans saved yet</td></tr></tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ ACCOUNTS ══════════ -->
+    <section class="page" id="page-accounts">
+      <div class="page-header"><h1>Accounts</h1><p>Track your bank accounts and savings. Current account balances seed the starting position of your cashflow forecast.</p></div>
+
+      <div class="cards">
+        <div class="card"><div class="card-label">Current Accounts</div><div class="card-value" id="acc-current-total">£0.00</div><div class="card-sub" id="acc-current-count">0 accounts</div></div>
+        <div class="card"><div class="card-label">Total Savings</div><div class="card-value green" id="acc-savings-total">£0.00</div><div class="card-sub" id="acc-savings-count">0 accounts</div></div>
+        <div class="card"><div class="card-label">Net Worth</div><div class="card-value" id="acc-net-worth">£0.00</div><div class="card-sub">All accounts combined</div></div>
+        <div class="card"><div class="card-label">Monthly to Savings</div><div class="card-value amber" id="acc-monthly-out">£0.00</div><div class="card-sub">Recurring transfers</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="tabs">
+          <div class="tab active" onclick="switchAccountTab('accounts', this)">Bank Accounts</div>
+          <div class="tab" onclick="switchAccountTab('transfers', this)">Transfers</div>
+        </div>
+
+        <!-- Accounts tab -->
+        <div class="tab-pane active" id="acc-tab-accounts">
+          <div class="panel-title" id="acc-form-title" style="margin-top:16px">Add an Account</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Account Name</label><input type="text" id="acc-name" placeholder="e.g. Halifax Current Account"/></div>
+            <div class="form-group"><label>Account Type</label>
+              <select id="acc-type" onchange="toggleAccInterestInput()">
+                <option value="current">Current Account</option>
+                <option value="savings">Savings Account</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Current Balance (£)</label><input type="number" id="acc-balance" placeholder="0.00" min="0" step="0.01"/></div>
+            <div class="form-group" id="acc-interest-group" style="display:none">
+              <label>Interest Rate (AER %)</label>
+              <input type="number" id="acc-interest-rate" placeholder="e.g. 4.5" min="0" step="0.01"/>
+              <span class="hint">Used to project your savings growth in the cashflow forecast</span>
+            </div>
+            <div class="form-group"><label>Note <span style="font-weight:400;color:#888;font-size:0.8rem">optional</span></label><input type="text" id="acc-note" placeholder="e.g. Main everyday account"/></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveAccount()">Save Account</button>
+            <button class="btn-sm-ghost" onclick="cancelAccountEdit()" id="acc-cancel-btn" style="display:none">Cancel</button>
+            <input type="hidden" id="acc-edit-id" value=""/>
+          </div>
+          <hr class="section-divider" style="margin-top:20px"/>
+          <div id="acc-accounts-list"><div class="empty-state" style="padding:24px 0">No accounts saved yet. Add your first account above.</div></div>
+        </div>
+
+        <!-- Transfers tab -->
+        <div class="tab-pane" id="acc-tab-transfers">
+          <div class="panel-title" id="acc-transfer-form-title" style="margin-top:16px">Add a Transfer</div>
+          <div id="acc-no-accounts-notice" style="display:none">
+            <div class="no-cards-notice">⚠️ You need at least two accounts before setting up transfers. <a href="#" onclick="switchAccountTab('accounts', document.querySelector('#page-accounts .tab'));return false;" style="color:#92400e;font-weight:700">Add accounts →</a></div>
+          </div>
+          <div id="acc-transfer-form-fields">
+            <div class="form-grid">
+              <div class="form-group"><label>From Account</label><select id="acc-transfer-from"></select></div>
+              <div class="form-group"><label>To Account</label><select id="acc-transfer-to"></select></div>
+              <div class="form-group"><label>Amount (£)</label><input type="number" id="acc-transfer-amount" placeholder="0.00" min="0.01" step="0.01"/></div>
+              <div class="form-group"><label>Frequency</label>
+                <select id="acc-transfer-frequency">
+                  <option value="one-off">One-off</option>
+                  <option value="monthly" selected>Monthly</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="fortnightly">Fortnightly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="annually">Annually</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Start Date</label><input type="date" id="acc-transfer-start"/></div>
+              <div class="form-group"><label>End Date <span style="font-weight:400;color:#888;font-size:0.8rem">optional</span></label><input type="date" id="acc-transfer-end"/></div>
+              <div class="form-group"><label>Note <span style="font-weight:400;color:#888;font-size:0.8rem">optional</span></label><input type="text" id="acc-transfer-note" placeholder="e.g. Monthly savings"/></div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="saveTransfer()">Save Transfer</button>
+              <button class="btn-sm-ghost" onclick="cancelTransferEdit()" id="acc-transfer-cancel-btn" style="display:none">Cancel</button>
+              <input type="hidden" id="acc-transfer-edit-id" value=""/>
+            </div>
+          </div>
+          <hr class="section-divider" style="margin-top:20px"/>
+          <div id="acc-transfers-list"><div class="empty-state" style="padding:24px 0">No transfers set up yet.</div></div>
         </div>
       </div>
     </section>
