@@ -1914,6 +1914,7 @@ renderOneoffList();
       renderDashboard();
       renderOneoffList();
     } else if (event === 'SIGNED_OUT') {
+      if (!currentUser) return; // ignore spurious SIGNED_OUT before session was established
       currentUser = null;
       updateUserUI();
       window.location.reload();
