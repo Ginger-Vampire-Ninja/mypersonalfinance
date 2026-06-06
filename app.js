@@ -1898,44 +1898,53 @@ renderOneoffList();
 (async () => {
   if (!db) { checkFirstVisit(); return; }
 
-  // Register BEFORE getSession() so OAuth SIGNED_IN events (fired while
-  // Supabase processes the #access_token hash during getSession) are never missed.
-  db.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN') {
-      currentUser = session.user;
-      _applyCurrencyFromUser(currentUser);
-      await loadUserData();
-      const hasLocalData = ['mf_income','mf_expenses','mf_recurring'].some(k => {
-        try { return JSON.parse(localStorage.getItem(k) || '[]').length > 0; } catch(e) { return false; }
-      });
-      if (hasLocalData) showMigrationBanner();
-      document.getElementById('landing-overlay').classList.add('hidden');
-      updateUserUI();
-      renderDashboard();
-      renderOneoffList();
-    } else if (event === 'SIGNED_OUT') {
-      if (!currentUser) return; // ignore spurious SIGNED_OUT before session was established
-      currentUser = null;
-      updateUserUI();
-      window.location.reload();
-    }
-  });
-
-  // Also handle existing sessions (page refresh / returning user).
-  // If the onAuthStateChange SIGNED_IN path already ran, this is a harmless
-  // second loadUserData call — data re-fetches cleanly.
-  const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    currentUser = session.user;
+  // Shared app-init: called once a user session is confirmed.
+  async function _initApp(user) {
+    currentUser = user;
     _applyCurrencyFromUser(currentUser);
     await loadUserData();
+    const hasLocalData = ['mf_income','mf_expenses','mf_recurring'].some(k => {
+      try { return JSON.parse(localStorage.getItem(k) || '[]').length > 0; } catch(e) { return false; }
+    });
+    if (hasLocalData) showMigrationBanner();
     document.getElementById('landing-overlay').classList.add('hidden');
     updateUserUI();
     renderDashboard();
     renderOneoffList();
+  }
+
+  // ── OAuth callback (implicit grant: #access_token=… in URL) ───────────
+  // In this Supabase build, getSession() does not process the URL hash.
+  // The token exchange fires a SIGNED_IN event via onAuthStateChange instead.
+  // Register the listener FIRST, then bail — _initApp runs when SIGNED_IN fires.
+  if (window.location.hash.startsWith('#access_token=')) {
+    db.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN') await _initApp(session.user);
+      else if (event === 'SIGNED_OUT' && currentUser) {
+        currentUser = null; updateUserUI(); window.location.reload();
+      }
+    });
+    return; // _initApp called by the listener above; nothing more to do here
+  }
+
+  // ── Normal flow: page refresh / returning user ─────────────────────────
+  // getSession() reads the session from localStorage without side-effects on it.
+  // Registering onAuthStateChange FIRST in this Supabase build fires SIGNED_OUT
+  // prematurely and wipes localStorage before getSession() can read it, so we
+  // always call getSession() first for non-OAuth page loads.
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    await _initApp(session.user);
   } else {
     checkFirstVisit();
   }
+
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && !currentUser) await _initApp(session.user);
+    else if (event === 'SIGNED_OUT' && currentUser) {
+      currentUser = null; updateUserUI(); window.location.reload();
+    }
+  });
 })();
 
 // Error telemetry
