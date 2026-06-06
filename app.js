@@ -65,12 +65,12 @@ function fromDbTransfer(t)  { return { id: t.id, fromAccountId: t.from_account_i
 async function dbUpsert(table, jsObj, toDbFn) {
   if (!currentUser || !db) return;
   const { error } = await db.from(table).upsert({ ...toDbFn(jsObj), user_id: currentUser.id });
-  if (error) console.error('dbUpsert', table, error);
+  if (error) { console.error('dbUpsert', table, error); toast('⚠️ Sync failed — saved locally but not to cloud.'); }
 }
 async function dbDelete(table, id) {
   if (!currentUser || !db) return;
   const { error } = await db.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error) console.error('dbDelete', table, error);
+  if (error) { console.error('dbDelete', table, error); toast('⚠️ Sync failed — deletion saved locally but not to cloud.'); }
 }
 
 // ── Load all data for signed-in user ──
@@ -308,11 +308,22 @@ let currentCurrency = localStorage.getItem('mf_currency') || 'GBP';
 function fmt(n)  { return CURRENCIES[currentCurrency].symbol + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function fmtS(n) { return (n < 0 ? '-' : '+') + fmt(n); }
 
+function _applyCurrencyFromUser(user) {
+  const saved = user?.user_metadata?.currency;
+  if (saved && CURRENCIES[saved] && saved !== currentCurrency) {
+    currentCurrency = saved;
+    localStorage.setItem('mf_currency', saved);
+    updateCurrencyUI();
+  }
+}
+
 function setCurrency(code) {
   if (!CURRENCIES[code]) return;
   currentCurrency = code;
   localStorage.setItem('mf_currency', code);
   updateCurrencyUI();
+  // Persist to Supabase user metadata so it syncs across devices
+  if (currentUser && db) db.auth.updateUser({ data: { currency: code } });
   // Re-render the active page so all amounts update immediately
   const active = document.querySelector('.page.active');
   if (active) {
@@ -1889,6 +1900,7 @@ renderOneoffList();
   const { data: { session } } = await db.auth.getSession();
   if (session) {
     currentUser = session.user;
+    _applyCurrencyFromUser(currentUser);
     await loadUserData();
     document.getElementById('landing-overlay').classList.add('hidden');
     updateUserUI();
@@ -1901,6 +1913,7 @@ renderOneoffList();
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
       currentUser = session.user;
+      _applyCurrencyFromUser(currentUser);
       await loadUserData();
       const hasLocalData = ['mf_income','mf_expenses','mf_recurring'].some(k => {
         try { return JSON.parse(localStorage.getItem(k) || '[]').length > 0; } catch(e) { return false; }
