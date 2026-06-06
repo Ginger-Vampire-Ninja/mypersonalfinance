@@ -6,13 +6,13 @@ This file provides guidance to Claude when working with code in this repository.
 
 ## Project overview
 
-Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1520 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
+Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1940 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
 
 Users can sign in with Google or GitHub (data syncs to Supabase cloud DB) or use the app as a guest (data stays in `localStorage` only). Both modes work simultaneously — `saveData()` always writes to `localStorage`; `dbUpsert`/`dbDelete` additionally sync to Supabase when `currentUser` is set.
 
 **Important:** Google AdSense is loaded conditionally via a dynamic `<script>` injection guarded by `location.hostname === 'finaura.app'`. Do not revert this to a static `<script async src="...">` tag — AdSense contains an infinite loop that hangs the page on `file://` URLs (local dev).
 
-**Important:** OAuth (`signInWithGoogle`) redirects to `https://finaura.app` — it will not complete on `file://` or local file URLs. Test auth on the live site or a local HTTP server.
+**Important:** OAuth (`signInWithGoogle`, `signInWithGitHub`) redirects to `https://finaura.app` — it will not complete on `file://` or local file URLs. Test auth on the live site or a local HTTP server.
 
 ## Repository files
 
@@ -85,10 +85,12 @@ let currentUser = null;
 ```
 
 **Auth flow:**
-1. `signInWithGoogle()` / `signInWithGitHub()` — calls `db.auth.signInWithOAuth({ provider: 'google'|'github', options: { redirectTo: 'https://finaura.app' } })`. Redirects away then back.
-2. On return, `db.auth.onAuthStateChange` fires `SIGNED_IN`. `loadUserData()` fetches all tables, replaces in-memory arrays, re-renders.
-3. On sign-out (`signOut()`), `SIGNED_OUT` fires and the page reloads (cleanest way to reset in-memory state).
-4. On page load, `db.auth.getSession()` checks for an active session (e.g. returning user with valid cookie). If found, data is loaded and the landing overlay is skipped. `checkFirstVisit()` is only called when no session exists.
+1. `signInWithGoogle()` / `signInWithGitHub()` — calls `db.auth.signInWithOAuth({ provider: 'google'|'github', options: { redirectTo: 'https://finaura.app' } })`. Redirects away then back with `#access_token=…` in the URL hash (implicit grant flow).
+2. **OAuth callback** — INIT detects `#access_token=` in the hash and registers `onAuthStateChange` **first** (before `getSession()`). In this Supabase build, the token exchange fires `SIGNED_IN` via the listener rather than being processed by `getSession()`. `_initApp()` runs from the listener.
+3. **Returning user / page refresh** — no hash in URL, so INIT calls `getSession()` first (reads the session from localStorage without side-effects). If session found, `_initApp()` runs directly; `onAuthStateChange` is registered afterwards for future sign-out events. **Do not register `onAuthStateChange` before `getSession()` in this path** — it triggers an internal Supabase `initialize()` that fires a premature `SIGNED_OUT`, wiping localStorage before `getSession()` can read it.
+4. `_initApp(user)` — shared helper: sets `currentUser`, `_applyCurrencyFromUser`, `loadUserData()`, hides landing overlay, updates UI, re-renders.
+5. On sign-out (`signOut()`), `SIGNED_OUT` fires. The handler guards with `if (!currentUser) return` to ignore the spurious `SIGNED_OUT` that Supabase fires on initialisation before a session is established. Actual sign-out reloads the page.
+6. `checkFirstVisit()` is only called when `getSession()` returns no session (new guest user).
 
 **DB tables** (snake_case columns) vs **JS objects** (camelCase):
 
@@ -158,15 +160,16 @@ Pages are `<section class="page" id="page-{name}">` elements. `navigate(page)` a
 
 ```js
 const renders = {
-  dashboard: renderDashboard,
-  oneoff: renderOneoffList,
-  recurring: () => { renderRecurringTable(); renderUpcomingTimeline(); },
-  cashflow: renderCashflow,
-  credit: renderCardList,
+  dashboard:      renderDashboard,
+  oneoff:         renderOneoffList,
+  recurring:      () => { renderRecurringTable(); renderUpcomingTimeline(); },
+  cashflow:       renderCashflow,
+  credit:         renderCardList,
   cctransactions: renderCCTransactions,
-  calculators: () => {},
-  deals: renderDealsPage,
-  loans: renderLoansPage
+  calculators:    () => {},
+  deals:          renderDealsPage,
+  loans:          renderLoansPage,
+  accounts:       renderAccountsPage,
 };
 ```
 
@@ -274,6 +277,12 @@ Sidebar teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 - `.btn-continue-guest` — ghost button for no-account path
 - `.migration-banner` — amber banner shown post sign-in when localStorage data exists
 - `.account-menu` / `.account-menu-btn` / `.account-menu-dropdown` — fixed top-right account dropdown (has dark mode overrides)
+- `.acc-account-item` — account card row in the accounts list
+- `.acc-account-info` — left side of account row (name + sub-text)
+- `.acc-account-name` — account display name
+- `.acc-account-sub` — account sub-text (type label or note)
+- `.acc-account-balance` — right-aligned balance figure
+- `.acc-rate-badge` — teal pill showing interest rate on savings accounts
 - Semantic colour utility classes — see **Dark mode** section. Always use instead of inline `style="color:#..."`.
 
 ### JS section locations in `app.js` (approximate line numbers)
@@ -296,10 +305,11 @@ Sidebar teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 | LOANS | 983 |
 | CALCULATORS | 1116 |
 | CARD TRANSACTIONS | 1177 |
+| ACCOUNTS | 1589 |
 | COLLAPSIBLE NAV | 1343 |
 | DARK MODE | 1389 |
 | LANDING PAGE (launchApp, checkFirstVisit) | 1413 |
-| INIT | 1435 |
+| INIT | 1898 |
 
 Use `grep -n "^//  "` on `app.js` to find the current line of any section quickly (double-space after `//`).
 
@@ -317,9 +327,13 @@ Playwright tests live in `tests/e2e.spec.js` and verify that every data type syn
 5. Query Supabase directly to assert the row exists with correct values
 6. `afterAll` deletes all rows for the test user so the DB stays clean
 
-**Tables covered:** `income`, `expenses`, `recurring`, `credit_cards`, `promo_deals`, `cc_transactions`, `loans`
+**Tables covered:** `income`, `expenses`, `recurring`, `credit_cards`, `promo_deals`, `cc_transactions`, `loans`, `accounts`, `savings_transfers` — **9 DB sync tests** plus 3 calc suite tests (12 total).
 
-**A prerequisite credit card** (`E2E Prereq Card`) is inserted directly via the Supabase API in `beforeAll` so the promo deal and CC transaction tests don't depend on the credit card UI test passing first.
+**Prerequisite records** are inserted directly via the Supabase API in `beforeAll` so later tests don't depend on earlier UI tests passing:
+- `E2E Prereq Card` — credit card used by the promo deal and CC transaction tests
+- `E2E Prereq Current` + `E2E Prereq Savings` — current and savings accounts used by the savings transfer test; the current account is also inserted by the calc suite `beforeAll` (seeded at £5,000) so the running-total assertion (`+£7,225.00`) is predictable
+
+`afterAll` cleans all rows for the test user across all nine tables, including `savings_transfers` and `accounts`.
 
 **Running locally:**
 ```bash
