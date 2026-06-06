@@ -101,6 +101,8 @@ let currentUser = null;
 | `promo_deals` | `toDbDeal` / `fromDbDeal` (`cardId` ↔ `card_id`) — renamed from `interest_free_deals` to avoid ad blocker URL blocking |
 | `cc_transactions` | `toDbCCT` / `fromDbCCT` (`cardId` ↔ `card_id`) |
 | `loans` | `toDbLoan` / `fromDbLoan` (`totalAmount` ↔ `total_amount`, etc.) |
+| `accounts` | `toDbAccount` / `fromDbAccount` (`interestRate` ↔ `interest_rate`) |
+| `savings_transfers` | `toDbTransfer` / `fromDbTransfer` (`fromAccountId` ↔ `from_account_id`, `toAccountId` ↔ `to_account_id`) |
 
 **Generic helpers:**
 - `dbUpsert(table, jsObj, toDbFn)` — no-op if `currentUser` is null (guest mode). Adds `user_id` automatically.
@@ -183,6 +185,8 @@ All state is module-level `let` variables, loaded from `localStorage` on startup
 | `interestFreeDeals` | `mf_deals` | `[{id, cardId, amount, startDate, endDate, note}]` |
 | `ccTransactions` | `mf_cc_transactions` | `[{id, cardId, date, amount, category, description, type}]` where `type` is `'charge'` or `'payment'` |
 | `loansData` | `mf_loans` | `[{id, lender, totalAmount, repaymentAmount, apr, frequency, startDate, endDate, note}]` |
+| `accountsData` | `mf_accounts` | `[{id, name, type: 'current'\|'savings', balance, interestRate, note}]` |
+| `savingsTransfers` | `mf_savings_transfers` | `[{id, fromAccountId, toAccountId, amount, frequency, startDate, endDate, note}]` — frequency includes `'one-off'` |
 
 **Other localStorage keys:**
 

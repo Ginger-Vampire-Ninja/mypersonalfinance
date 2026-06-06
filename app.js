@@ -9,7 +9,9 @@ let interestFreeDeals= JSON.parse(localStorage.getItem('mf_deals')     || '[]');
 // Load CC transactions, defaulting legacy entries (no type field) to 'charge'
 let ccTransactions = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]')
   .map(t => ({ ...t, type: t.type || 'charge' }));
-let loansData = JSON.parse(localStorage.getItem('mf_loans') || '[]');
+let loansData        = JSON.parse(localStorage.getItem('mf_loans')             || '[]');
+let accountsData     = JSON.parse(localStorage.getItem('mf_accounts')          || '[]');
+let savingsTransfers = JSON.parse(localStorage.getItem('mf_savings_transfers') || '[]');
 
 // One-time migration: absorb any entries saved under the old separate CC payments key
 (function migrateCCPayments() {
@@ -27,7 +29,9 @@ function saveData() {
   localStorage.setItem('mf_cards',     JSON.stringify(creditCards));
   localStorage.setItem('mf_deals',           JSON.stringify(interestFreeDeals));
   localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
-  localStorage.setItem('mf_loans',           JSON.stringify(loansData));
+  localStorage.setItem('mf_loans',             JSON.stringify(loansData));
+  localStorage.setItem('mf_accounts',          JSON.stringify(accountsData));
+  localStorage.setItem('mf_savings_transfers', JSON.stringify(savingsTransfers));
 }
 
 // ══════════════════════════════════════════════════
@@ -52,6 +56,10 @@ function toDbCCT(t)         { return { id: t.id, card_id: t.cardId, date: t.date
 function fromDbCCT(t)       { return { id: t.id, cardId: t.card_id, date: t.date, amount: parseFloat(t.amount), category: t.category, description: t.description, type: t.type || 'charge' }; }
 function toDbLoan(l)        { return { id: l.id, lender: l.lender, total_amount: l.totalAmount, repayment_amount: l.repaymentAmount, apr: l.apr || null, frequency: l.frequency, start_date: l.startDate, end_date: l.endDate || null, note: l.note || null }; }
 function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: parseFloat(l.total_amount), repaymentAmount: parseFloat(l.repayment_amount), apr: l.apr ? parseFloat(l.apr) : null, frequency: l.frequency, startDate: l.start_date, endDate: l.end_date, note: l.note }; }
+function toDbAccount(a)     { return { id: a.id, name: a.name, type: a.type, balance: a.balance, interest_rate: a.interestRate || null, note: a.note || null }; }
+function fromDbAccount(a)   { return { id: a.id, name: a.name, type: a.type, balance: parseFloat(a.balance), interestRate: a.interest_rate ? parseFloat(a.interest_rate) : null, note: a.note }; }
+function toDbTransfer(t)    { return { id: t.id, from_account_id: t.fromAccountId, to_account_id: t.toAccountId, amount: t.amount, frequency: t.frequency, start_date: t.startDate, end_date: t.endDate || null, note: t.note || null }; }
+function fromDbTransfer(t)  { return { id: t.id, fromAccountId: t.from_account_id, toAccountId: t.to_account_id, amount: parseFloat(t.amount), frequency: t.frequency, startDate: t.start_date, endDate: t.end_date, note: t.note }; }
 
 // ── Generic DB helpers ──
 async function dbUpsert(table, jsObj, toDbFn) {
@@ -69,7 +77,7 @@ async function dbDelete(table, id) {
 async function loadUserData() {
   const uid = currentUser.id;
   try {
-    const [inc, exp, rec, cards, deals, cct, loans] = await Promise.all([
+    const [inc, exp, rec, cards, deals, cct, loans, accs, transfers] = await Promise.all([
       db.from('income').select('*').eq('user_id', uid),
       db.from('expenses').select('*').eq('user_id', uid),
       db.from('recurring').select('*').eq('user_id', uid),
@@ -77,14 +85,18 @@ async function loadUserData() {
       db.from('promo_deals').select('*').eq('user_id', uid),
       db.from('cc_transactions').select('*').eq('user_id', uid),
       db.from('loans').select('*').eq('user_id', uid),
+      db.from('accounts').select('*').eq('user_id', uid),
+      db.from('savings_transfers').select('*').eq('user_id', uid),
     ]);
-    incomeData        = (inc.data   || []).map(fromDbIncome);
-    expenseData       = (exp.data   || []).map(fromDbIncome);
-    recurringData     = (rec.data   || []).map(fromDbRecurring);
-    creditCards       = (cards.data || []).map(fromDbCard);
-    interestFreeDeals = (deals.data || []).map(fromDbDeal);
-    ccTransactions    = (cct.data   || []).map(fromDbCCT);
-    loansData         = (loans.data || []).map(fromDbLoan);
+    incomeData        = (inc.data       || []).map(fromDbIncome);
+    expenseData       = (exp.data       || []).map(fromDbIncome);
+    recurringData     = (rec.data       || []).map(fromDbRecurring);
+    creditCards       = (cards.data     || []).map(fromDbCard);
+    interestFreeDeals = (deals.data     || []).map(fromDbDeal);
+    ccTransactions    = (cct.data       || []).map(fromDbCCT);
+    loansData         = (loans.data     || []).map(fromDbLoan);
+    accountsData      = (accs.data      || []).map(fromDbAccount);
+    savingsTransfers  = (transfers.data || []).map(fromDbTransfer);
   } catch (err) {
     console.error('loadUserData failed', err);
     toast('⚠️ Could not load your cloud data — showing locally saved data instead.');
@@ -272,6 +284,7 @@ function navigate(page) {
     oneoff: renderOneoffList,
     recurring: () => { renderRecurringTable(); renderUpcomingTimeline(); },
     cashflow: renderCashflow,
+    accounts: renderAccountsPage,
     credit: renderCardList,
     cctransactions: renderCCTransactions,
     calculators: () => {}, // static page, no render needed
@@ -344,11 +357,11 @@ function isThisMonthOrFuture(ds) {
 }
 function setDefaultDates() {
   const t = todayStr();
-  ['oneoff-date','rec-start','deal-start','cct-date','loan-start'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
+  ['oneoff-date','rec-start','deal-start','cct-date','loan-start','acc-transfer-start'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
 }
 
-const FREQ_MONTHLY = { weekly:52/12, fortnightly:26/12, monthly:1, quarterly:4/12, annually:1/12 };
-const FREQ_LABELS  = { weekly:'Weekly', fortnightly:'Fortnightly', monthly:'Monthly', quarterly:'Quarterly', annually:'Annually' };
+const FREQ_MONTHLY = { weekly:52/12, fortnightly:26/12, monthly:1, quarterly:4/12, annually:1/12, 'one-off':0 };
+const FREQ_LABELS  = { weekly:'Weekly', fortnightly:'Fortnightly', monthly:'Monthly', quarterly:'Quarterly', annually:'Annually', 'one-off':'One-off' };
 function monthlyEquiv(item) { return item.amount * FREQ_MONTHLY[item.frequency]; }
 
 function getMonthTotals(data, nMonths) {
@@ -456,6 +469,11 @@ function generateProjection(numMonths) {
     balance: c.balance
   }));
 
+  // Clone savings account balances for roll-forward projection
+  const savingsStates = accountsData
+    .filter(a => a.type === 'savings')
+    .map(a => ({ id: a.id, name: a.name, balance: a.balance, interestRate: a.interestRate || 0 }));
+
   const rows = [];
 
   for (let i = 0; i < numMonths; i++) {
@@ -482,6 +500,41 @@ function generateProjection(numMonths) {
       const loanItem = { frequency: loan.frequency, startDate: loan.startDate, endDate: loan.endDate || null, amount: loan.repaymentAmount };
       const amt = getAmountForMonth(loanItem, yr, mo);
       if (amt > 0) { recExp += amt; expItems.push({ name: loan.lender + ' (loan)', amount: amt }); }
+    });
+
+    // Savings transfers from current accounts — cashflow outgoing
+    savingsTransfers.forEach(transfer => {
+      const fromAcc = accountsData.find(a => a.id === transfer.fromAccountId);
+      if (!fromAcc || fromAcc.type !== 'current') return;
+      const toAcc = accountsData.find(a => a.id === transfer.toAccountId);
+      const label = toAcc ? 'Transfer → ' + toAcc.name : 'Savings transfer';
+      let amt = 0;
+      if (transfer.frequency === 'one-off') {
+        const d = new Date(transfer.startDate + 'T00:00:00');
+        if (d.getFullYear() === yr && d.getMonth() === mo) amt = transfer.amount;
+      } else {
+        const item = { frequency: transfer.frequency, startDate: transfer.startDate, endDate: transfer.endDate || null, amount: transfer.amount };
+        amt = getAmountForMonth(item, yr, mo);
+      }
+      if (amt > 0) { recExp += amt; expItems.push({ name: label, amount: amt }); }
+    });
+
+    // Update savings account balances: apply incoming transfers then monthly interest
+    savingsTransfers.forEach(transfer => {
+      const toSavings = savingsStates.find(s => s.id === transfer.toAccountId);
+      if (!toSavings) return;
+      let amt = 0;
+      if (transfer.frequency === 'one-off') {
+        const d = new Date(transfer.startDate + 'T00:00:00');
+        if (d.getFullYear() === yr && d.getMonth() === mo) amt = transfer.amount;
+      } else {
+        const item = { frequency: transfer.frequency, startDate: transfer.startDate, endDate: transfer.endDate || null, amount: transfer.amount };
+        amt = getAmountForMonth(item, yr, mo);
+      }
+      if (amt > 0) toSavings.balance += amt;
+    });
+    savingsStates.forEach(s => {
+      if (s.interestRate > 0) s.balance = s.balance * (1 + s.interestRate / 100 / 12);
     });
 
     // One-off income for this calendar month
@@ -556,7 +609,8 @@ function generateProjection(numMonths) {
       cardSnapshot: cardStates.map(c => ({
         id: c.id, name: c.name, balance: c.balance,
         hasActiveDeal: getInterestFreeAmount(c.id, monthStart) > 0
-      }))
+      })),
+      savingsSnapshot: savingsStates.map(s => ({ id: s.id, name: s.name, balance: s.balance }))
     });
   }
   return rows;
@@ -820,8 +874,11 @@ function renderCashflow() {
     </div>`;
   }).join('')||'<div class="empty-state">Add recurring transactions to see projections</div>';
 
-  // Monthly breakdown table
-  let running=0;
+  // Monthly breakdown table — seed running total from current account balances
+  const currentAccBalance = accountsData
+    .filter(a => a.type === 'current')
+    .reduce((s, a) => s + a.balance, 0);
+  let running = currentAccBalance;
   document.getElementById('cf-table-body').innerHTML=rows.map(r=>{
     running+=r.net;
     const nc=r.net>0?'cf-positive':r.net<0?'cf-negative':'cf-zero';
@@ -844,17 +901,33 @@ function renderCashflow() {
 
   // Card balance tracker
   const panel=document.getElementById('cf-card-tracker-panel');
-  if (!creditCards.length) { panel.style.display='none'; return; }
-  panel.style.display='block';
-  const table=document.getElementById('cf-card-tracker-table');
-  table.innerHTML='<thead><tr><th>Month</th>'+creditCards.map(c=>`<th>${c.name}</th>`).join('')+'</tr></thead><tbody>'
+  if (!creditCards.length) { panel.style.display='none'; }
+  else {
+    panel.style.display='block';
+    const table=document.getElementById('cf-card-tracker-table');
+    table.innerHTML='<thead><tr><th>Month</th>'+creditCards.map(c=>`<th>${c.name}</th>`).join('')+'</tr></thead><tbody>'
+      +rows.map(r=>`<tr class="${r.isPast?'cf-past':''}"><td>${formatMonthYear(r.yr,r.mo)}</td>`
+        +creditCards.map(card=>{
+          const snap=r.cardSnapshot.find(s=>s.id===card.id);
+          const bal=snap?snap.balance:0;
+          if (bal<=0.005) return '<td class="text-paid-off">✓ Paid off</td>';
+          const dealActive=snap?snap.hasActiveDeal:false;
+          return `<td class="${dealActive?'text-deal-active':'text-expense'}">${fmt(bal)}${dealActive?' <span class="zero-pct-tag">0%</span>':''}</td>`;
+        }).join('')+'</tr>').join('')+'</tbody>';
+  }
+
+  // Savings account tracker
+  const savingsPanel=document.getElementById('cf-savings-tracker-panel');
+  const savingsAccounts=accountsData.filter(a=>a.type==='savings');
+  if (!savingsAccounts.length) { savingsPanel.style.display='none'; return; }
+  savingsPanel.style.display='block';
+  const savingsTable=document.getElementById('cf-savings-tracker-table');
+  savingsTable.innerHTML='<thead><tr><th>Month</th>'+savingsAccounts.map(a=>`<th>${a.name}${a.interestRate?` <span class="acc-rate-badge">${a.interestRate}% AER</span>`:''}</th>`).join('')+'</tr></thead><tbody>'
     +rows.map(r=>`<tr class="${r.isPast?'cf-past':''}"><td>${formatMonthYear(r.yr,r.mo)}</td>`
-      +creditCards.map(card=>{
-        const snap=r.cardSnapshot.find(s=>s.id===card.id);
-        const bal=snap?snap.balance:0;
-        if (bal<=0.005) return '<td class="text-paid-off">✓ Paid off</td>';
-        const dealActive=snap?snap.hasActiveDeal:false;
-        return `<td class="${dealActive?'text-deal-active':'text-expense'}">${fmt(bal)}${dealActive?' <span class="zero-pct-tag">0%</span>':''}</td>`;
+      +savingsAccounts.map(acc=>{
+        const snap=r.savingsSnapshot?r.savingsSnapshot.find(s=>s.id===acc.id):null;
+        const bal=snap?snap.balance:acc.balance;
+        return `<td class="text-income">${fmt(bal)}</td>`;
       }).join('')+'</tr>').join('')+'</tbody>';
 }
 
@@ -1478,6 +1551,232 @@ function renderCCTransactions() {
       </td>
     </tr>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  ACCOUNTS
+// ══════════════════════════════════════════════════
+let editingAccountId  = null;
+let editingTransferId = null;
+
+function toggleAccInterestInput() {
+  const type = document.getElementById('acc-type').value;
+  document.getElementById('acc-interest-group').style.display = type === 'savings' ? '' : 'none';
+}
+
+function switchAccountTab(tab, el) {
+  document.querySelectorAll('#page-accounts .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#page-accounts .tab-pane').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('acc-tab-' + tab).classList.add('active');
+  if (tab === 'transfers') _populateTransferSelects();
+}
+
+function _populateTransferSelects() {
+  const opts = accountsData.map(a =>
+    `<option value="${a.id}">${a.name} (${a.type === 'current' ? 'Current' : 'Savings'})</option>`).join('');
+  ['acc-transfer-from','acc-transfer-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts || '<option value="">— add accounts first —</option>';
+  });
+  const notice = document.getElementById('acc-no-accounts-notice');
+  const fields  = document.getElementById('acc-transfer-form-fields');
+  const hide    = accountsData.length < 2;
+  if (notice) notice.style.display = hide ? '' : 'none';
+  if (fields)  fields.style.display = hide ? 'none' : '';
+}
+
+function saveAccount() {
+  const name        = document.getElementById('acc-name').value.trim();
+  const type        = document.getElementById('acc-type').value;
+  const balance     = parseFloat(document.getElementById('acc-balance').value) || 0;
+  const interestRate= type === 'savings' ? (parseFloat(document.getElementById('acc-interest-rate').value) || null) : null;
+  const note        = document.getElementById('acc-note').value.trim();
+  if (!name) { toast('Please enter an account name.'); return; }
+  const isEdit = !!editingAccountId;
+  const id     = editingAccountId || Date.now();
+  const account = { id, name, type, balance, interestRate, note };
+  if (isEdit) { const i = accountsData.findIndex(a => a.id === id); if (i > -1) accountsData[i] = account; }
+  else accountsData.push(account);
+  saveData();
+  dbUpsert('accounts', account, toDbAccount);
+  editingAccountId = null;
+  ['acc-name','acc-balance','acc-interest-rate','acc-note'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('acc-type').value = 'current';
+  document.getElementById('acc-cancel-btn').style.display = 'none';
+  document.getElementById('acc-form-title').textContent = 'Add an Account';
+  document.getElementById('acc-edit-id').value = '';
+  toggleAccInterestInput();
+  renderAccountsPage();
+  toast(isEdit ? 'Account updated.' : 'Account saved.');
+}
+
+function editAccount(id) {
+  const a = accountsData.find(a => a.id === id);
+  if (!a) return;
+  editingAccountId = id;
+  document.getElementById('acc-name').value    = a.name;
+  document.getElementById('acc-type').value    = a.type;
+  document.getElementById('acc-balance').value = a.balance;
+  if (a.interestRate != null) document.getElementById('acc-interest-rate').value = a.interestRate;
+  document.getElementById('acc-note').value    = a.note || '';
+  document.getElementById('acc-edit-id').value = id;
+  document.getElementById('acc-cancel-btn').style.display = '';
+  document.getElementById('acc-form-title').textContent = 'Edit Account';
+  toggleAccInterestInput();
+  // Switch to accounts tab and scroll to form
+  document.querySelectorAll('#page-accounts .tab')[0]?.click();
+  document.getElementById('acc-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelAccountEdit() {
+  editingAccountId = null;
+  ['acc-name','acc-balance','acc-interest-rate','acc-note'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('acc-type').value = 'current';
+  document.getElementById('acc-cancel-btn').style.display = 'none';
+  document.getElementById('acc-form-title').textContent = 'Add an Account';
+  document.getElementById('acc-edit-id').value = '';
+  toggleAccInterestInput();
+}
+
+function deleteAccount(id) {
+  if (!confirm('Delete this account? Any transfers involving it will also be removed.')) return;
+  accountsData     = accountsData.filter(a => a.id !== id);
+  const orphans    = savingsTransfers.filter(t => t.fromAccountId === id || t.toAccountId === id);
+  savingsTransfers = savingsTransfers.filter(t => t.fromAccountId !== id && t.toAccountId !== id);
+  orphans.forEach(t => dbDelete('savings_transfers', t.id));
+  saveData();
+  dbDelete('accounts', id);
+  renderAccountsPage();
+  toast('Account deleted.');
+}
+
+function saveTransfer() {
+  const fromId    = parseInt(document.getElementById('acc-transfer-from').value);
+  const toId      = parseInt(document.getElementById('acc-transfer-to').value);
+  const amount    = parseFloat(document.getElementById('acc-transfer-amount').value);
+  const frequency = document.getElementById('acc-transfer-frequency').value;
+  const startDate = document.getElementById('acc-transfer-start').value;
+  const endDate   = document.getElementById('acc-transfer-end').value;
+  const note      = document.getElementById('acc-transfer-note').value.trim();
+  if (!fromId || !toId)     { toast('Please select both accounts.'); return; }
+  if (fromId === toId)      { toast('From and To accounts must be different.'); return; }
+  if (!amount || amount<=0) { toast('Please enter a valid amount.'); return; }
+  if (!startDate)           { toast('Please enter a start date.'); return; }
+  const isEdit   = !!editingTransferId;
+  const id       = editingTransferId || Date.now();
+  const transfer = { id, fromAccountId: fromId, toAccountId: toId, amount, frequency, startDate, endDate: endDate || null, note };
+  if (isEdit) { const i = savingsTransfers.findIndex(t => t.id === id); if (i > -1) savingsTransfers[i] = transfer; }
+  else savingsTransfers.push(transfer);
+  saveData();
+  dbUpsert('savings_transfers', transfer, toDbTransfer);
+  editingTransferId = null;
+  ['acc-transfer-amount','acc-transfer-end','acc-transfer-note'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('acc-transfer-frequency').value = 'monthly';
+  document.getElementById('acc-transfer-cancel-btn').style.display = 'none';
+  document.getElementById('acc-transfer-form-title').textContent = 'Add a Transfer';
+  document.getElementById('acc-transfer-edit-id').value = '';
+  renderAccountsPage();
+  toast(isEdit ? 'Transfer updated.' : 'Transfer saved.');
+}
+
+function editTransfer(id) {
+  const t = savingsTransfers.find(t => t.id === id);
+  if (!t) return;
+  editingTransferId = id;
+  _populateTransferSelects();
+  document.getElementById('acc-transfer-from').value      = t.fromAccountId;
+  document.getElementById('acc-transfer-to').value        = t.toAccountId;
+  document.getElementById('acc-transfer-amount').value    = t.amount;
+  document.getElementById('acc-transfer-frequency').value = t.frequency;
+  document.getElementById('acc-transfer-start').value     = t.startDate;
+  document.getElementById('acc-transfer-end').value       = t.endDate || '';
+  document.getElementById('acc-transfer-note').value      = t.note || '';
+  document.getElementById('acc-transfer-edit-id').value   = id;
+  document.getElementById('acc-transfer-cancel-btn').style.display = '';
+  document.getElementById('acc-transfer-form-title').textContent   = 'Edit Transfer';
+  // Switch to transfers tab
+  document.querySelectorAll('#page-accounts .tab')[1]?.click();
+}
+
+function cancelTransferEdit() {
+  editingTransferId = null;
+  ['acc-transfer-amount','acc-transfer-end','acc-transfer-note'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('acc-transfer-frequency').value = 'monthly';
+  document.getElementById('acc-transfer-cancel-btn').style.display = 'none';
+  document.getElementById('acc-transfer-form-title').textContent = 'Add a Transfer';
+  document.getElementById('acc-transfer-edit-id').value = '';
+}
+
+function deleteTransfer(id) {
+  if (!confirm('Delete this transfer?')) return;
+  savingsTransfers = savingsTransfers.filter(t => t.id !== id);
+  saveData();
+  dbDelete('savings_transfers', id);
+  renderAccountsPage();
+  toast('Transfer deleted.');
+}
+
+function renderAccountsPage() {
+  const currentAccs  = accountsData.filter(a => a.type === 'current');
+  const savingsAccs  = accountsData.filter(a => a.type === 'savings');
+  const totalCurrent = currentAccs.reduce((s, a) => s + a.balance, 0);
+  const totalSavings = savingsAccs.reduce((s, a) => s + a.balance, 0);
+  const monthlyOut   = savingsTransfers
+    .filter(t => t.frequency !== 'one-off')
+    .reduce((s, t) => s + monthlyEquiv(t), 0);
+
+  document.getElementById('acc-current-total').textContent  = fmt(totalCurrent);
+  document.getElementById('acc-current-count').textContent  = currentAccs.length + ' account' + (currentAccs.length !== 1 ? 's' : '');
+  document.getElementById('acc-savings-total').textContent  = fmt(totalSavings);
+  document.getElementById('acc-savings-count').textContent  = savingsAccs.length + ' account' + (savingsAccs.length !== 1 ? 's' : '');
+  document.getElementById('acc-net-worth').textContent      = fmt(totalCurrent + totalSavings);
+  document.getElementById('acc-monthly-out').textContent    = fmt(monthlyOut);
+
+  // Accounts list
+  const listEl = document.getElementById('acc-accounts-list');
+  listEl.innerHTML = !accountsData.length
+    ? '<div class="empty-state" style="padding:24px 0">No accounts saved yet. Add your first account above.</div>'
+    : accountsData.map(a => `
+      <div class="acc-account-item">
+        <div class="acc-account-info">
+          <div class="acc-account-name">
+            <span class="badge ${a.type==='current'?'badge-freq':'badge-income'}">${a.type==='current'?'🏦 Current':'💰 Savings'}</span>
+            ${a.name}
+          </div>
+          ${a.interestRate != null ? `<div class="acc-account-sub">${a.interestRate}% AER · interest compounded monthly</div>` : ''}
+          ${a.note ? `<div class="acc-account-sub text-muted">${a.note}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="acc-account-balance">${fmt(a.balance)}</div>
+          <button class="btn-sm-ghost" onclick="editAccount(${a.id})">Edit</button>
+          <button class="btn-sm-danger" onclick="deleteAccount(${a.id})">Delete</button>
+        </div>
+      </div>`).join('');
+
+  // Transfers list
+  const transfersEl = document.getElementById('acc-transfers-list');
+  transfersEl.innerHTML = !savingsTransfers.length
+    ? '<div class="empty-state" style="padding:24px 0">No transfers set up yet.</div>'
+    : '<div class="table-wrap"><table><thead><tr><th>From</th><th>To</th><th>Amount</th><th>Frequency</th><th>Start</th><th>End</th><th>Note</th><th></th></tr></thead><tbody>'
+      + savingsTransfers.map(t => {
+          const fromAcc = accountsData.find(a => a.id === t.fromAccountId);
+          const toAcc   = accountsData.find(a => a.id === t.toAccountId);
+          return `<tr>
+            <td>${fromAcc ? fromAcc.name : '<span class="text-muted">deleted</span>'}</td>
+            <td>${toAcc   ? toAcc.name   : '<span class="text-muted">deleted</span>'}</td>
+            <td class="text-expense">${fmt(t.amount)}</td>
+            <td><span class="badge badge-freq">${FREQ_LABELS[t.frequency]||t.frequency}</span></td>
+            <td>${formatDate(t.startDate)}</td>
+            <td>${t.endDate ? formatDate(t.endDate) : '—'}</td>
+            <td class="text-muted">${t.note || '—'}</td>
+            <td style="white-space:nowrap">
+              <button class="btn-sm-ghost" onclick="editTransfer(${t.id})" style="margin-right:4px">Edit</button>
+              <button class="btn-sm-danger" onclick="deleteTransfer(${t.id})">Delete</button>
+            </td>
+          </tr>`;
+        }).join('')
+      + '</tbody></table></div>';
 }
 
 // ══════════════════════════════════════════════════

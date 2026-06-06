@@ -381,5 +381,18 @@ html[data-theme="dark"] .account-menu-item.danger:hover { background: rgba(248,1
 html[data-theme="dark"] .account-menu-divider { background: rgba(255,255,255,0.08); }
 html[data-theme="dark"] .account-menu-item-soon { color: #475569; }
 
+/* ── Accounts page ── */
+.acc-account-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border, #e5e7eb); gap: 12px; }
+.acc-account-item:last-child { border-bottom: none; }
+.acc-account-info { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.acc-account-name { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acc-account-sub { font-size: 0.78rem; color: #888; }
+.acc-account-balance { font-size: 1.15rem; font-weight: 700; color: #0F766E; white-space: nowrap; }
+.acc-rate-badge { font-size: 0.68rem; font-weight: 600; background: rgba(45,212,191,0.15); color: #0F766E; border-radius: 5px; padding: 1px 6px; vertical-align: middle; }
+html[data-theme="dark"] .acc-account-item { border-color: rgba(255,255,255,0.08); }
+html[data-theme="dark"] .acc-account-sub { color: #64748b; }
+html[data-theme="dark"] .acc-account-balance { color: #2DD4BF; }
+html[data-theme="dark"] .acc-rate-badge { background: rgba(45,212,191,0.12); color: #2DD4BF; }
+
 /* ── Sidebar user-info (remove sign-out, just show name when signed in) ── */
 .user-profile { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; color: rgba(255,255,255,0.65); }

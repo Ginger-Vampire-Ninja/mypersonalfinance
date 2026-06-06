@@ -20,7 +20,9 @@ test.describe.configure({ mode: 'serial' });
 let client;
 let testUserId;
 let sessionJson;
-let testCardId; // card created in beforeAll, used by deal + CC txn tests
+let testCardId;       // card created in beforeAll, used by deal + CC txn tests
+let testCurrentAccId; // current account created in beforeAll, used by transfer test
+let testSavingsAccId; // savings account created in beforeAll, used by transfer test
 
 // ── Setup & teardown ──────────────────────────────
 test.beforeAll(async () => {
@@ -53,6 +55,17 @@ test.beforeAll(async () => {
     min_fixed: null,
   });
   if (cardErr) throw new Error('Failed to create prereq card: ' + cardErr.message);
+
+  // Create prereq accounts so savings transfer test has selectable from/to accounts
+  testCurrentAccId = Date.now() + 10;
+  testSavingsAccId  = Date.now() + 11;
+  const { error: accErr } = await client.from('accounts').insert([
+    { id: testCurrentAccId, user_id: testUserId, name: 'E2E Prereq Current',
+      type: 'current', balance: 1000, interest_rate: null, note: null },
+    { id: testSavingsAccId,  user_id: testUserId, name: 'E2E Prereq Savings',
+      type: 'savings', balance: 500,  interest_rate: 3.5,  note: null },
+  ]);
+  if (accErr) throw new Error('Failed to create prereq accounts: ' + accErr.message);
 });
 
 test.afterAll(async () => {
@@ -66,6 +79,8 @@ test.afterAll(async () => {
     client.from('cc_transactions').delete().eq('user_id', testUserId),
     client.from('credit_cards').delete().eq('user_id', testUserId),
     client.from('loans').delete().eq('user_id', testUserId),
+    client.from('savings_transfers').delete().eq('user_id', testUserId),
+    client.from('accounts').delete().eq('user_id', testUserId),
   ]);
   await client.auth.signOut();
 });
@@ -230,6 +245,62 @@ test('loan syncs to DB', async ({ page }) => {
   expect(parseFloat(data[0].total_amount)).toBe(10000);
 });
 
+test('current account syncs to DB', async ({ page }) => {
+  await loadApp(page);
+  await page.evaluate(() => navigate('accounts'));
+  await page.waitForSelector('#acc-name', { state: 'visible' });
+
+  await page.fill('#acc-name', 'E2E Current Account');
+  await page.fill('#acc-balance', '3000');
+  // Type defaults to 'current' — leave as-is
+  await page.click('button[onclick="saveAccount()"]');
+
+  await page.waitForTimeout(2000);
+
+  const { data, error } = await client
+    .from('accounts').select('*')
+    .eq('user_id', testUserId).eq('name', 'E2E Current Account');
+  expect(error).toBeNull();
+  expect(data).toHaveLength(1);
+  expect(data[0].type).toBe('current');
+  expect(parseFloat(data[0].balance)).toBe(3000);
+});
+
+test('savings transfer syncs to DB', async ({ page }) => {
+  await loadApp(page);
+  await page.evaluate(() => navigate('accounts'));
+  await page.waitForSelector('#acc-name', { state: 'visible' });
+
+  // Switch to Transfers tab so the from/to selects are populated
+  await page.click('button[onclick="switchAccountTab(\'transfers\')"]');
+  await page.waitForSelector('#acc-transfer-from', { state: 'visible' });
+
+  // Wait for the prereq accounts to populate the dropdowns
+  await page.waitForFunction(
+    id => document.querySelector(`#acc-transfer-from option[value="${id}"]`) !== null,
+    testCurrentAccId
+  );
+
+  await page.selectOption('#acc-transfer-from', { value: String(testCurrentAccId) });
+  await page.selectOption('#acc-transfer-to',   { value: String(testSavingsAccId) });
+  await page.fill('#acc-transfer-amount', '200');
+  await page.selectOption('#acc-transfer-freq', { value: 'monthly' });
+  await page.fill('#acc-transfer-start', new Date().toISOString().split('T')[0]);
+  await page.click('button[onclick="saveTransfer()"]');
+
+  await page.waitForTimeout(2000);
+
+  const { data, error } = await client
+    .from('savings_transfers').select('*')
+    .eq('user_id', testUserId)
+    .eq('from_account_id', testCurrentAccId)
+    .eq('to_account_id',   testSavingsAccId);
+  expect(error).toBeNull();
+  expect(data).toHaveLength(1);
+  expect(parseFloat(data[0].amount)).toBe(200);
+  expect(data[0].frequency).toBe('monthly');
+});
+
 // ══════════════════════════════════════════════════
 //  Dashboard & Cashflow Calculation Tests
 //
@@ -237,6 +308,7 @@ test('loan syncs to DB', async ({ page }) => {
 //  and displays figures across all transaction types.
 //
 //  Known test data inserted via API (not UI):
+//    - Current account:   £5,000 balance (seeds cashflow running total)
 //    - Recurring income:  £3,000/month
 //    - Recurring expense: £800/month
 //    - One-off income:    £500
@@ -252,7 +324,7 @@ test('loan syncs to DB', async ({ page }) => {
 //  Expected cashflow month 1:
 //    recInc=£3,000 | recExp=£1,000 | oneOffInc=£500
 //    oneOffExp=£250 (£200 + £50 CC payment) | ccMin=£25
-//    net = £2,225 | card balance after = £1,046
+//    net = £2,225 | running = £7,225 (£5,000 seed + £2,225) | card balance after = £1,046
 // ══════════════════════════════════════════════════
 test.describe('Dashboard and Cashflow calculations', () => {
   const today = new Date().toISOString().split('T')[0];
@@ -268,6 +340,8 @@ test.describe('Dashboard and Cashflow calculations', () => {
       client.from('cc_transactions').delete().eq('user_id', testUserId),
       client.from('credit_cards').delete().eq('user_id', testUserId),
       client.from('loans').delete().eq('user_id', testUserId),
+      client.from('savings_transfers').delete().eq('user_id', testUserId),
+      client.from('accounts').delete().eq('user_id', testUserId),
     ]);
 
     const base = Date.now();
@@ -279,6 +353,13 @@ test.describe('Dashboard and Cashflow calculations', () => {
       balance: 1000, apr: 24, min_type: 'percent', min_pct: 2, min_floor: 25, min_fixed: null,
     });
     if (cardErr) throw new Error('Failed to insert calc card: ' + cardErr.message);
+
+    // Insert a £5,000 current account — seeds the cashflow running total
+    const { error: accErr } = await client.from('accounts').insert({
+      id: base + 20, user_id: testUserId, name: 'Calc Current Account',
+      type: 'current', balance: 5000, interest_rate: null, note: null,
+    });
+    if (accErr) throw new Error('Failed to insert calc account: ' + accErr.message);
 
     const inserts = await Promise.all([
       client.from('recurring').insert({ id: base+1, user_id: testUserId, type: 'income',
@@ -360,8 +441,8 @@ test.describe('Dashboard and Cashflow calculations', () => {
     // Net = 3,000 + 500 - 1,000 - 250 - 25 = £2,225
     expect(row.net).toBe('+£2,225.00');
 
-    // Running total = net (first month)
-    expect(row.running).toBe('+£2,225.00');
+    // Running total = current account seed (£5,000) + net (£2,225) = £7,225
+    expect(row.running).toBe('+£7,225.00');
   });
 
   test('cashflow card tracker shows correct balance after CC activity and interest', async ({ page }) => {
