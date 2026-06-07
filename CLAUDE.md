@@ -102,7 +102,7 @@ let currentUser = null;
 | `income` | `toDbIncome` / `fromDbIncome` |
 | `expenses` | `toDbIncome` / `fromDbIncome` (same shape) |
 | `recurring` | `toDbRecurring` / `fromDbRecurring` (`startDate` ↔ `start_date`, `endDate` ↔ `end_date`) |
-| `credit_cards` | `toDbCard` / `fromDbCard` (`minType` ↔ `min_type`, etc.) |
+| `credit_cards` | `toDbCard` / `fromDbCard` (`minType` ↔ `min_type`, `creditLimit` ↔ `credit_limit`) — **requires `credit_limit NUMERIC DEFAULT NULL` column** (run migration before deploying) |
 | `promo_deals` | `toDbDeal` / `fromDbDeal` (`cardId` ↔ `card_id`) — renamed from `interest_free_deals` to avoid ad blocker URL blocking |
 | `cc_transactions` | `toDbCCT` / `fromDbCCT` (`cardId` ↔ `card_id`) |
 | `loans` | `toDbLoan` / `fromDbLoan` (`totalAmount` ↔ `total_amount`, etc.) |
@@ -187,7 +187,7 @@ All state is module-level `let` variables, loaded from `localStorage` on startup
 | `incomeData` | `mf_income` | `[{id, date, category, amount, description}]` |
 | `expenseData` | `mf_expenses` | same as income |
 | `recurringData` | `mf_recurring` | `[{id, type, name, category, amount, frequency, startDate, endDate}]` |
-| `creditCards` | `mf_cards` | `[{id, name, balance, apr, minType, minPct, minFloor, minFixed}]` |
+| `creditCards` | `mf_cards` | `[{id, name, balance, apr, minType, minPct, minFloor, minFixed, creditLimit}]` — `creditLimit` is optional (null if not set) |
 | `interestFreeDeals` | `mf_deals` | `[{id, cardId, amount, startDate, endDate, note}]` |
 | `ccTransactions` | `mf_cc_transactions` | `[{id, cardId, date, amount, category, description, type}]` where `type` is `'charge'` or `'payment'` |
 | `loansData` | `mf_loans` | `[{id, lender, totalAmount, repaymentAmount, apr, frequency, startDate, endDate, note}]` |

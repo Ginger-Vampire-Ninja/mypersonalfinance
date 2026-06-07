@@ -118,6 +118,16 @@ tr:hover td { background: #fafafa; }
 .cf-oneoff-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 4px; vertical-align: middle; cursor: help; }
 .zero-pct-tag { font-size: 0.65rem; font-weight: 700; color: #0F766E; background: #CCFBF1; border-radius: 4px; padding: 1px 4px; margin-left: 4px; }
 
+/* ── Credit card utilisation bar (card list + cashflow tracker) ── */
+.cc-util-bar-wrap { height: 5px; background: #e5e7eb; border-radius: 3px; margin-top: 5px; overflow: hidden; min-width: 70px; }
+.cc-util-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.cc-util-bar-green  { background: #10B981; }
+.cc-util-bar-amber  { background: #f59e0b; }
+.cc-util-bar-red    { background: #ef4444; }
+.cc-util-label { font-size: 0.68rem; color: #9ca3af; margin-top: 2px; }
+html[data-theme="dark"] .cc-util-bar-wrap { background: #334155; }
+html[data-theme="dark"] .cc-util-label { color: #64748b; }
+
 /* Bar chart */
 .bar-chart { margin: 16px 0 8px; }
 .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
