@@ -186,6 +186,11 @@
 
 <div class="app">
 
+  <!-- Guest sign-in button (shown when not signed in) -->
+  <div id="guest-signin-btn" style="display:none">
+    <button class="btn-guest-signin" onclick="showSignInOverlay()">Sign in</button>
+  </div>
+
   <!-- Top-right account menu (shown when signed in) -->
   <div class="account-menu" id="account-menu" style="display:none">
     <div class="account-menu-btn" onclick="toggleAccountMenu()" id="account-menu-btn">

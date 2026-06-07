@@ -381,6 +381,13 @@ html[data-theme="dark"] .account-menu-item.danger:hover { background: rgba(248,1
 html[data-theme="dark"] .account-menu-divider { background: rgba(255,255,255,0.08); }
 html[data-theme="dark"] .account-menu-item-soon { color: #475569; }
 
+/* ── Guest sign-in button (top-right, shown when not signed in) ── */
+#guest-signin-btn { position: fixed; top: 12px; right: 20px; z-index: 150; }
+.btn-guest-signin { background: transparent; border: 1.5px solid #2DD4BF; color: #2DD4BF; border-radius: 20px; padding: 6px 18px; font-size: 0.83rem; font-weight: 600; cursor: pointer; transition: background 0.15s; letter-spacing: 0.01em; }
+.btn-guest-signin:hover { background: rgba(45,212,191,0.12); }
+html[data-theme="dark"] .btn-guest-signin { border-color: #2DD4BF; color: #2DD4BF; }
+html[data-theme="dark"] .btn-guest-signin:hover { background: rgba(45,212,191,0.15); }
+
 /* ── Accounts page ── */
 .acc-account-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border, #e5e7eb); gap: 12px; }
 .acc-account-item:last-child { border-bottom: none; }

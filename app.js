@@ -211,6 +211,8 @@ function updateUserUI() {
   } else {
     menuEl.style.display = 'none';
   }
+  const guestBtn = document.getElementById('guest-signin-btn');
+  if (guestBtn) guestBtn.style.display = currentUser ? 'none' : 'block';
 }
 
 function toggleAccountMenu() {
@@ -1872,6 +1874,10 @@ function launchApp() {
   document.getElementById('landing-overlay').classList.add('hidden');
 }
 
+function showSignInOverlay() {
+  document.getElementById('landing-overlay').classList.remove('hidden');
+}
+
 function checkFirstVisit() {
   // Show landing overlay if user has never launched the app before
   // Skip it if they already have data (existing users who update the app)
@@ -1896,7 +1902,7 @@ renderDashboard();
 renderOneoffList();
 
 (async () => {
-  if (!db) { checkFirstVisit(); return; }
+  if (!db) { checkFirstVisit(); updateUserUI(); return; }
 
   // Shared app-init: called once a user session is confirmed.
   async function _initApp(user) {
@@ -1937,6 +1943,7 @@ renderOneoffList();
     await _initApp(session.user);
   } else {
     checkFirstVisit();
+    updateUserUI(); // show guest sign-in button for returning guests
   }
 
   db.auth.onAuthStateChange(async (event, session) => {
