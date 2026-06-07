@@ -48,8 +48,8 @@ function toDbIncome(r)      { return { id: r.id, date: r.date, category: r.categ
 function fromDbIncome(r)    { return { id: r.id, date: r.date, category: r.category, amount: parseFloat(r.amount), description: r.description }; }
 function toDbRecurring(r)   { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: r.amount, frequency: r.frequency, start_date: r.startDate, end_date: r.endDate || null }; }
 function fromDbRecurring(r) { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: parseFloat(r.amount), frequency: r.frequency, startDate: r.start_date, endDate: r.end_date }; }
-function toDbCard(c)        { return { id: c.id, name: c.name, balance: c.balance, apr: c.apr, min_type: c.minType, min_pct: c.minPct || null, min_floor: c.minFloor || null, min_fixed: c.minFixed || null }; }
-function fromDbCard(c)      { return { id: c.id, name: c.name, balance: parseFloat(c.balance), apr: parseFloat(c.apr), minType: c.min_type, minPct: c.min_pct ? parseFloat(c.min_pct) : null, minFloor: c.min_floor ? parseFloat(c.min_floor) : null, minFixed: c.min_fixed ? parseFloat(c.min_fixed) : null }; }
+function toDbCard(c)        { return { id: c.id, name: c.name, balance: c.balance, apr: c.apr, min_type: c.minType, min_pct: c.minPct || null, min_floor: c.minFloor || null, min_fixed: c.minFixed || null, credit_limit: c.creditLimit || null }; }
+function fromDbCard(c)      { return { id: c.id, name: c.name, balance: parseFloat(c.balance), apr: parseFloat(c.apr), minType: c.min_type, minPct: c.min_pct ? parseFloat(c.min_pct) : null, minFloor: c.min_floor ? parseFloat(c.min_floor) : null, minFixed: c.min_fixed ? parseFloat(c.min_fixed) : null, creditLimit: c.credit_limit ? parseFloat(c.credit_limit) : null }; }
 function toDbDeal(d)        { return { id: d.id, card_id: d.cardId, amount: d.amount, start_date: d.startDate, end_date: d.endDate, note: d.note || null }; }
 function fromDbDeal(d)      { return { id: d.id, cardId: d.card_id, amount: parseFloat(d.amount), startDate: d.start_date, endDate: d.end_date, note: d.note }; }
 function toDbCCT(t)         { return { id: t.id, card_id: t.cardId, date: t.date, amount: t.amount, category: t.category, description: t.description || null, type: t.type }; }
@@ -468,7 +468,7 @@ function generateProjection(numMonths) {
   const cardStates = creditCards.map(c => ({
     id: c.id, name: c.name, apr: c.apr,
     minType: c.minType, minPct: c.minPct, minFloor: c.minFloor, minFixed: c.minFixed,
-    balance: c.balance
+    balance: c.balance, limit: c.creditLimit || null
   }));
 
   // Clone savings account balances for roll-forward projection
@@ -609,7 +609,7 @@ function generateProjection(numMonths) {
       recExp, oneOffExp, expItems, oneOffExpItems,
       ccTotal, ccPayments,
       cardSnapshot: cardStates.map(c => ({
-        id: c.id, name: c.name, balance: c.balance,
+        id: c.id, name: c.name, balance: c.balance, limit: c.limit,
         hasActiveDeal: getInterestFreeAmount(c.id, monthStart) > 0
       })),
       savingsSnapshot: savingsStates.map(s => ({ id: s.id, name: s.name, balance: s.balance }))
@@ -914,7 +914,14 @@ function renderCashflow() {
           const bal=snap?snap.balance:0;
           if (bal<=0.005) return '<td class="text-paid-off">✓ Paid off</td>';
           const dealActive=snap?snap.hasActiveDeal:false;
-          return `<td class="${dealActive?'text-deal-active':'text-expense'}">${fmt(bal)}${dealActive?' <span class="zero-pct-tag">0%</span>':''}</td>`;
+          const limit=snap?snap.limit:null;
+          let barHtml='';
+          if (limit&&limit>0) {
+            const pct=Math.min(Math.round(bal/limit*100),100);
+            const col=pct>=90?'red':pct>=70?'amber':'green';
+            barHtml=`<div class="cc-util-bar-wrap"><div class="cc-util-bar-fill cc-util-bar-${col}" style="width:${pct}%"></div></div><div class="cc-util-label">${pct}%</div>`;
+          }
+          return `<td class="${dealActive?'text-deal-active':'text-expense'}">${fmt(bal)}${dealActive?' <span class="zero-pct-tag">0%</span>':''}${barHtml}</td>`;
         }).join('')+'</tr>').join('')+'</tbody>';
   }
 
@@ -951,19 +958,21 @@ function saveCard() {
   const minPct=parseFloat(document.getElementById('cc-min-pct').value);
   const minFloor=parseFloat(document.getElementById('cc-min-floor').value)||25;
   const minFixed=parseFloat(document.getElementById('cc-min-fixed').value);
+  const creditLimitRaw=parseFloat(document.getElementById('cc-credit-limit').value);
+  const creditLimit=(!isNaN(creditLimitRaw)&&creditLimitRaw>0)?creditLimitRaw:null;
   if (!name)                    { toast('⚠️ Enter a card name'); return; }
   if (isNaN(balance)||balance<0){ toast('⚠️ Enter a valid balance'); return; }
   if (isNaN(apr)||apr<=0)       { toast('⚠️ Enter a valid APR'); return; }
   if (minType==='percent'&&(isNaN(minPct)||minPct<=0)) { toast('⚠️ Enter a valid minimum %'); return; }
   if (minType==='fixed'&&(isNaN(minFixed)||minFixed<=0)){ toast('⚠️ Enter a valid fixed payment'); return; }
-  const card={ id:editId?parseInt(editId):Date.now(), name, balance, apr, minType, minPct, minFloor, minFixed };
+  const card={ id:editId?parseInt(editId):Date.now(), name, balance, apr, minType, minPct, minFloor, minFixed, creditLimit };
   if (editId) creditCards=creditCards.map(c=>c.id===card.id?card:c); else creditCards.push(card);
   dbUpsert('credit_cards', card, toDbCard);
   saveData(); renderCardList(); clearCardForm(); toast(editId?'✅ Card updated!':'✅ Card saved!');
   if (window.posthog) posthog.capture('card_saved', { is_edit: !!editId, min_type: minType });
 }
 function clearCardForm() {
-  ['cc-name','cc-balance','cc-apr','cc-min-pct','cc-min-fixed'].forEach(id=>document.getElementById(id).value='');
+  ['cc-name','cc-balance','cc-apr','cc-min-pct','cc-min-fixed','cc-credit-limit'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cc-min-floor').value='25';
   document.getElementById('cc-min-type').value='percent';
   document.getElementById('cc-edit-id').value='';
@@ -981,6 +990,7 @@ function editCard(id) {
   document.getElementById('cc-min-pct').value =c.minPct||'';
   document.getElementById('cc-min-floor').value=c.minFloor||25;
   document.getElementById('cc-min-fixed').value=c.minFixed||'';
+  document.getElementById('cc-credit-limit').value=c.creditLimit||'';
   document.getElementById('cc-edit-id').value =id;
   document.getElementById('cc-form-title').textContent='Editing: '+c.name;
   document.getElementById('cc-cancel-btn').style.display='';
@@ -1024,7 +1034,11 @@ function renderCardList() {
         <div class="card-meta">${c.apr}% APR &nbsp;·&nbsp; Min: ${minLabel} &nbsp;·&nbsp; Monthly interest: ${fmt(interest)} ${dealBadges?'&nbsp;'+dealBadges:''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-        <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Balance</div><div class="card-balance">${fmt(c.balance)}</div></div>
+        <div>
+          <div style="font-size:0.72rem;color:#aaa;text-align:right">Balance${c.creditLimit?` / Limit`:''}</div>
+          <div class="card-balance">${fmt(c.balance)}${c.creditLimit?`<span style="font-size:0.78rem;color:#aaa;font-weight:500"> / ${fmt(c.creditLimit)}</span>`:''}</div>
+          ${c.creditLimit?(()=>{const pct=Math.min(Math.round(c.balance/c.creditLimit*100),100);const col=pct>=90?'red':pct>=70?'amber':'green';return `<div class="cc-util-bar-wrap"><div class="cc-util-bar-fill cc-util-bar-${col}" style="width:${pct}%"></div></div><div class="cc-util-label">${pct}% used</div>`;})():''}
+        </div>
         <div><div style="font-size:0.72rem;color:#aaa;text-align:right">Next min payment</div><div class="text-cc" style="font-weight:700">${fmt(minPay)}</div></div>
         <div style="display:flex;gap:8px">
           <button class="btn-sm-ghost" onclick="editCard(${c.id})">Edit</button>
