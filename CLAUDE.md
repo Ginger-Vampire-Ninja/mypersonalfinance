@@ -71,8 +71,11 @@ PostHog EU Cloud init snippet stays in `index.html` `<head>` — **never move it
 | `loan_saved` | `saveLoan()` | `is_edit`, `frequency` |
 | `cashflow_viewed` | `renderCashflow()` | `months` |
 | `cc_transaction_added` | `addCCTransaction()` | `type`, `category` |
+| `account_saved` | `saveAccount()` | `is_edit`, `type` (`'current'` or `'savings'`) |
+| `transfer_saved` | `saveTransfer()` | `is_edit`, `frequency` |
+| `signin_overlay_opened` | `showSignInOverlay()` | `trigger` (`'guest_btn'`) |
 | `dark_mode_toggled` | `toggleDarkMode()` | `theme` (`'dark'` or `'light'`) |
-| `js_error` | `window.onerror` / `onunhandledrejection` | `message`, `source`, `line`, `stack` |
+| `js_error` | `window.onerror` / `onunhandledrejection` | `message`, `source`, `line`, `col`, `stack` |
 
 ### Supabase auth & cloud database
 

@@ -1602,6 +1602,7 @@ function saveAccount() {
   else accountsData.push(account);
   saveData();
   dbUpsert('accounts', account, toDbAccount);
+  if (window.posthog) posthog.capture('account_saved', { is_edit: isEdit, type });
   editingAccountId = null;
   ['acc-name','acc-balance','acc-interest-rate','acc-note'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('acc-type').value = 'current';
@@ -1672,6 +1673,7 @@ function saveTransfer() {
   else savingsTransfers.push(transfer);
   saveData();
   dbUpsert('savings_transfers', transfer, toDbTransfer);
+  if (window.posthog) posthog.capture('transfer_saved', { is_edit: isEdit, frequency });
   editingTransferId = null;
   ['acc-transfer-amount','acc-transfer-end','acc-transfer-note'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('acc-transfer-frequency').value = 'monthly';
@@ -1875,6 +1877,7 @@ function launchApp() {
 }
 
 function showSignInOverlay() {
+  if (window.posthog) posthog.capture('signin_overlay_opened', { trigger: 'guest_btn' });
   document.getElementById('landing-overlay').classList.remove('hidden');
 }
 
