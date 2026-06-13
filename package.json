@@ -2,8 +2,10 @@
   "name": "finaura-tests",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "npx serve . -p 3000 --no-clipboard",
+    "test:unit": "node --test tests/engine.test.js",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
