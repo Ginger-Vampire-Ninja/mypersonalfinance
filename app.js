@@ -310,6 +310,18 @@ let currentCurrency = localStorage.getItem('mf_currency') || 'GBP';
 function fmt(n)  { return CURRENCIES[currentCurrency].symbol + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function fmtS(n) { return (n < 0 ? '-' : '+') + fmt(n); }
 
+// Cryptographically random integer ID — fits in JS safe integer and PostgreSQL int8
+function genId() {
+  const arr = new Uint32Array(2);
+  crypto.getRandomValues(arr);
+  return ((arr[0] & 0x1FFFFF) * 0x100000000) + arr[1];
+}
+
+// HTML-escape user-controlled strings before inserting via innerHTML
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function _applyCurrencyFromUser(user) {
   const saved = user?.user_metadata?.currency;
   if (saved && CURRENCIES[saved] && saved !== currentCurrency) {
@@ -703,12 +715,12 @@ function renderDashboard() {
 
   const ri = [...incomeData].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-recent-income').innerHTML = ri.length
-    ? ri.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-income">${r.category}</span></td><td class="text-income">${fmt(r.amount)}</td></tr>`).join('')
+    ? ri.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-income">${esc(r.category)}</span></td><td class="text-income">${fmt(r.amount)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty-state">No income yet</td></tr>';
 
   const re = [...expenseData].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-recent-expenses').innerHTML = re.length
-    ? re.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-expense">${r.category}</span></td><td class="text-expense">${fmt(r.amount)}</td></tr>`).join('')
+    ? re.map(r=>`<tr><td>${formatDate(r.date)}</td><td><span class="badge badge-expense">${esc(r.category)}</span></td><td class="text-expense">${fmt(r.amount)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty-state">No expenses yet</td></tr>';
 
   const today = new Date(); today.setHours(0,0,0,0);
@@ -725,7 +737,7 @@ function renderDashboard() {
   }
   upDiv.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Amount</th></tr></thead><tbody>'
     + upcoming.map(u => `<tr><td>${formatDate(u.date.toISOString().split('T')[0])}</td>
-        <td style="font-weight:600">${u.name}</td>
+        <td style="font-weight:600">${esc(u.name)}</td>
         <td><span class="badge badge-${u.type}">${u.type}</span></td>
         <td class="${u.type==='income'?'text-income':'text-expense'}">${u.type==='income'?'+':'-'}${fmt(u.amount)}</td></tr>`).join('')
     + '</tbody></table></div>';
@@ -759,7 +771,7 @@ function addOneoff() {
   const amt=parseFloat(document.getElementById('oneoff-amount').value), desc=document.getElementById('oneoff-description').value.trim();
   if (!date) { toast('⚠️ Please pick a date'); return; }
   if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
-  const entry = { id:Date.now(), date, category:cat, amount:amt, description:desc||cat };
+  const entry = { id:genId(), date, category:cat, amount:amt, description:desc||cat };
   if (currentOneoffType==='income') { incomeData.push(entry); dbUpsert('income', entry, toDbIncome); }
   else { expenseData.push(entry); dbUpsert('expenses', entry, toDbIncome); }
   saveData(); renderOneoffList(); toast('✅ Entry added!');
@@ -814,8 +826,8 @@ function renderOneoffList() {
     return `<tr>
       <td>${formatDate(r.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
       <td><span class="badge badge-${r.type}">${r.type}</span></td>
-      <td>${r.category}</td>
-      <td class="text-muted">${r.description}</td>
+      <td>${esc(r.category)}</td>
+      <td class="text-muted">${esc(r.description)}</td>
       <td class="${r.type==='income'?'text-income':'text-expense'}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</td>
       <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
       ${actionCell}</tr>`;
@@ -881,7 +893,7 @@ function saveRecurring() {
   if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
   if (!start)             { toast('⚠️ Pick a start date'); return; }
   const isEdit = !!editingRecurringId;
-  const id = editingRecurringId || Date.now();
+  const id = editingRecurringId || genId();
   const rec = { id, type: currentRecType, name, category: cat, amount: amt, frequency: freq, startDate: start, endDate: end||null, activeMonths };
   if (isEdit) { const i = recurringData.findIndex(r => r.id === id); if (i > -1) recurringData[i] = rec; }
   else recurringData.push(rec);
@@ -939,7 +951,7 @@ function renderRecurringTable() {
   // Build loan read-only rows
   const loanRows = loansData.map(loan => `<tr style="opacity:0.8">
     <td><span class="badge badge-expense" style="background:#1e3a5f;color:#93c5fd">🏦 Loan</span></td>
-    <td style="font-weight:600">${loan.lender}</td><td class="text-muted-sm">Loan Repayment</td>
+    <td style="font-weight:600">${esc(loan.lender)}</td><td class="text-muted-sm">Loan Repayment</td>
     <td style="font-weight:600">${fmt(loan.repaymentAmount)}</td>
     <td><span class="badge badge-freq">${FREQ_LABELS[loan.frequency]||loan.frequency}</span></td>
     <td class="text-muted">${fmt(monthlyEquiv({ amount: loan.repaymentAmount, frequency: loan.frequency }))}/mo</td>
@@ -952,8 +964,8 @@ function renderRecurringTable() {
       ? `<div class="rec-months-badge">${r.activeMonths.length <= 5 ? r.activeMonths.map(m=>REC_MONTH_NAMES[m]).join(', ') : r.activeMonths.length+'/12 months'}</div>` : '';
     return `<tr>
       <td><span class="badge badge-${r.type}">${r.type}</span></td>
-      <td style="font-weight:600">${r.name}${mBadge}</td>
-      <td>${r.category}</td>
+      <td style="font-weight:600">${esc(r.name)}${mBadge}</td>
+      <td>${esc(r.category)}</td>
       <td style="font-weight:600">${fmt(r.amount)}</td>
       <td><span class="badge badge-freq">${FREQ_LABELS[r.frequency]}</span></td>
       <td class="text-muted">${fmt(monthlyEquiv(r))}/mo</td>
@@ -980,7 +992,7 @@ function renderUpcomingTimeline() {
   Object.entries(byDate).forEach(([ds,txns])=>{
     const label=new Date(ds+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
     txns.forEach(t=>{ html+=`<div class="tl-item"><div class="tl-dot ${t.type}"></div><div class="tl-date">${label}</div>
-      <div class="tl-content"><div><div class="tl-name">${t.name}</div><div class="tl-cat">${t.category} · ${FREQ_LABELS[t.freq]}</div></div>
+      <div class="tl-content"><div><div class="tl-name">${esc(t.name)}</div><div class="tl-cat">${esc(t.category)} · ${FREQ_LABELS[t.freq]}</div></div>
       <div class="tl-amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</div></div></div>`; });
   });
   div.innerHTML=html+'</div>';
@@ -1055,7 +1067,7 @@ function renderCashflow() {
   else {
     panel.style.display='block';
     const table=document.getElementById('cf-card-tracker-table');
-    table.innerHTML='<thead><tr><th>Month</th>'+creditCards.map(c=>`<th>${c.name}</th>`).join('')+'</tr></thead><tbody>'
+    table.innerHTML='<thead><tr><th>Month</th>'+creditCards.map(c=>`<th>${esc(c.name)}</th>`).join('')+'</tr></thead><tbody>'
       +rows.map(r=>`<tr class="${r.isPast?'cf-past':''}"><td>${formatMonthYear(r.yr,r.mo)}</td>`
         +creditCards.map(card=>{
           const snap=r.cardSnapshot.find(s=>s.id===card.id);
@@ -1079,7 +1091,7 @@ function renderCashflow() {
   if (!savingsAccounts.length) { savingsPanel.style.display='none'; return; }
   savingsPanel.style.display='block';
   const savingsTable=document.getElementById('cf-savings-tracker-table');
-  savingsTable.innerHTML='<thead><tr><th>Month</th>'+savingsAccounts.map(a=>`<th>${a.name}${a.interestRate?` <span class="acc-rate-badge">${a.interestRate}% AER</span>`:''}</th>`).join('')+'</tr></thead><tbody>'
+  savingsTable.innerHTML='<thead><tr><th>Month</th>'+savingsAccounts.map(a=>`<th>${esc(a.name)}${a.interestRate?` <span class="acc-rate-badge">${a.interestRate}% AER</span>`:''}</th>`).join('')+'</tr></thead><tbody>'
     +rows.map(r=>`<tr class="${r.isPast?'cf-past':''}"><td>${formatMonthYear(r.yr,r.mo)}</td>`
       +savingsAccounts.map(acc=>{
         const snap=r.savingsSnapshot?r.savingsSnapshot.find(s=>s.id===acc.id):null;
@@ -1113,7 +1125,7 @@ function saveCard() {
   if (isNaN(apr)||apr<=0)       { toast('⚠️ Enter a valid APR'); return; }
   if (minType==='percent'&&(isNaN(minPct)||minPct<=0)) { toast('⚠️ Enter a valid minimum %'); return; }
   if (minType==='fixed'&&(isNaN(minFixed)||minFixed<=0)){ toast('⚠️ Enter a valid fixed payment'); return; }
-  const card={ id:editId?parseInt(editId):Date.now(), name, balance, apr, minType, minPct, minFloor, minFixed, creditLimit };
+  const card={ id:editId?parseInt(editId):genId(), name, balance, apr, minType, minPct, minFloor, minFixed, creditLimit };
   if (editId) creditCards=creditCards.map(c=>c.id===card.id?card:c); else creditCards.push(card);
   dbUpsert('credit_cards', card, toDbCard);
   saveData(); renderCardList(); clearCardForm(); toast(editId?'✅ Card updated!':'✅ Card saved!');
@@ -1174,11 +1186,11 @@ function renderCardList() {
     const dealBadges=activeDeals.map(d=>{
       const e=new Date(d.endDate+'T00:00:00');
       const days=Math.round((e-now)/86400000);
-      return `<span class="badge badge-active" title="${d.note||''}">0% on ${fmt(d.amount)} — ${days}d left</span>`;
+      return `<span class="badge badge-active" title="${esc(d.note||'')}">0% on ${fmt(d.amount)} — ${days}d left</span>`;
     }).join(' ');
     return `<div class="card-list-item">
       <div>
-        <div class="card-name">💳 ${c.name}</div>
+        <div class="card-name">💳 ${esc(c.name)}</div>
         <div class="card-meta">${c.apr}% APR &nbsp;·&nbsp; Min: ${minLabel} &nbsp;·&nbsp; Monthly interest: ${fmt(interest)} ${dealBadges?'&nbsp;'+dealBadges:''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
@@ -1208,7 +1220,7 @@ function renderDealsPage() {
   const sel = document.getElementById('deal-card-id');
   const currentVal = sel.value;
   sel.innerHTML = '<option value="">— select a card —</option>'
-    + creditCards.map(c => `<option value="${c.id}">${c.name} (${fmt(c.balance)} balance)</option>`).join('');
+    + creditCards.map(c => `<option value="${c.id}">${esc(c.name)} (${fmt(c.balance)} balance)</option>`).join('');
   if (currentVal) sel.value = currentVal;
 
   // Show/hide form based on whether any cards exist
@@ -1270,10 +1282,10 @@ function renderDealsPage() {
 
     return `<div class="deal-item ${cls}">
       <div style="flex:1;min-width:220px">
-        <div class="deal-card-name">💳 ${ccName}</div>
+        <div class="deal-card-name">💳 ${esc(ccName)}</div>
         <div class="deal-meta">
           ${badge}
-          ${d.note ? `<span class="text-muted">${d.note}</span>` : ''}
+          ${d.note ? `<span class="text-muted">${esc(d.note)}</span>` : ''}
         </div>
         <div class="deal-meta" style="margin-top:6px">
           <span>📅 ${formatDate(d.startDate)} → ${formatDate(d.endDate)}</span>
@@ -1311,7 +1323,7 @@ function saveDeal() {
   if (!end)                     { toast('⚠️ Enter an end date'); return; }
   if (end <= start)             { toast('⚠️ End date must be after start date'); return; }
 
-  const deal = { id: editId ? parseInt(editId) : Date.now(), cardId, amount, startDate: start, endDate: end, note };
+  const deal = { id: editId ? parseInt(editId) : genId(), cardId, amount, startDate: start, endDate: end, note };
   if (editId) interestFreeDeals = interestFreeDeals.map(d => d.id === deal.id ? deal : d);
   else        interestFreeDeals.push(deal);
   dbUpsert('promo_deals', deal, toDbDeal);
@@ -1401,14 +1413,14 @@ function renderLoansPage() {
   tbody.innerHTML = loansData.map(l => {
     const isActive = !l.endDate || l.endDate >= today;
     return `<tr>
-      <td style="font-weight:600">${l.lender}</td>
+      <td style="font-weight:600">${esc(l.lender)}</td>
       <td>${fmt(l.totalAmount)}</td>
       <td style="font-weight:600">${fmt(l.repaymentAmount)}</td>
       <td><span class="badge badge-freq">${FREQ_LABELS[l.frequency] || l.frequency}</span></td>
       <td class="text-muted">${l.apr ? l.apr + '%' : '—'}</td>
       <td class="text-muted-sm">${formatDate(l.startDate)}</td>
       <td class="text-muted-sm">${l.endDate ? formatDate(l.endDate) : '—'}</td>
-      <td class="text-muted-sm">${l.note || '—'}</td>
+      <td class="text-muted-sm">${esc(l.note || '—')}</td>
       <td style="white-space:nowrap">
         <button class="btn-sm" onclick="editLoan(${l.id})" style="margin-right:4px">Edit</button>
         <button class="btn-sm-danger" onclick="deleteLoan(${l.id})">Delete</button>
@@ -1439,7 +1451,7 @@ function saveLoan() {
     toast('✅ Loan updated');
     if (window.posthog) posthog.capture('loan_saved', { is_edit: true, frequency });
   } else {
-    const id = Date.now();
+    const id = genId();
     const loan = { id, lender, totalAmount, repaymentAmount, frequency, apr, startDate, endDate, note };
     loansData.push(loan); dbUpsert('loans', loan, toDbLoan);
     toast('✅ Loan saved');
@@ -1583,7 +1595,7 @@ function addCCTransaction() {
   if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
   if (!date)                        { toast('⚠️ Pick a date'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
-  const newTxn = { id: Date.now(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type };
+  const newTxn = { id: genId(), cardId, date, amount, category: cat, description: desc || (type === 'charge' ? cat : 'CC Payment'), type };
   ccTransactions.push(newTxn); dbUpsert('cc_transactions', newTxn, toDbCCT);
   saveData(); renderCCTransactions(); toast(type === 'charge' ? '✅ Charge added!' : '✅ Payment recorded!');
   if (window.posthog) posthog.capture('cc_transaction_added', { type, category: cat });
@@ -1637,7 +1649,7 @@ function renderCCTransactions() {
   if (cardSel && creditCards.length) {
     const prev = cardSel.value;
     cardSel.innerHTML = '<option value="">— select a card —</option>'
-      + creditCards.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      + creditCards.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
     if (prev) cardSel.value = prev;
   }
 
@@ -1676,7 +1688,7 @@ function renderCCTransactions() {
   }
 
   const catOpts  = (sel) => CC_TXN_CATS.map(c => `<option${c===sel?' selected':''}>${c}</option>`).join('');
-  const cardOpts = (sel) => creditCards.map(c => `<option value="${c.id}"${c.id===sel?' selected':''}>${c.name}</option>`).join('');
+  const cardOpts = (sel) => creditCards.map(c => `<option value="${c.id}"${c.id===sel?' selected':''}>${esc(c.name)}</option>`).join('');
 
   tbody.innerHTML = rows.map(t => {
     const card      = creditCards.find(c => c.id === t.cardId);
@@ -1691,7 +1703,7 @@ function renderCCTransactions() {
         <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
         <td><select class="cct-edit-input" data-field="card" style="width:140px">${cardOpts(t.cardId)}</select></td>
         <td>${isPayment ? '<span class="text-muted-sm">—</span>' : `<select class="cct-edit-input" data-field="cat" style="width:130px">${catOpts(t.category)}</select>`}</td>
-        <td><input class="cct-edit-input" data-field="desc" type="text" value="${t.description}" placeholder="Description"/></td>
+        <td><input class="cct-edit-input" data-field="desc" type="text" value="${esc(t.description)}" placeholder="Description"/></td>
         <td><input class="cct-edit-input" data-field="amount" type="number" value="${t.amount}" min="0.01" step="0.01" style="width:90px"/></td>
         <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
         <td style="white-space:nowrap">
@@ -1704,9 +1716,9 @@ function renderCCTransactions() {
     return `<tr>
       <td>${formatDate(t.date)}${future?` <span class="badge badge-oneoff">future</span>`:''}</td>
       <td><span class="badge ${isPayment?'badge-income':'badge-expense'}" style="font-size:0.72rem">${isPayment?'💸 Payment':'💳 Charge'}</span></td>
-      <td><span class="badge badge-card">💳 ${cardName}</span></td>
-      <td class="text-muted">${isPayment ? '—' : t.category}</td>
-      <td class="text-muted">${t.description}</td>
+      <td><span class="badge badge-card">💳 ${esc(cardName)}</span></td>
+      <td class="text-muted">${isPayment ? '—' : esc(t.category)}</td>
+      <td class="text-muted">${esc(t.description)}</td>
       <td class="${isPayment?'text-income':'text-cc'}">${isPayment?'-':'-'}${fmt(t.amount)}</td>
       <td>${inFc?'<span class="badge badge-freq">In forecast</span>':'<span class="text-muted-sm">Historical</span>'}</td>
       <td style="white-space:nowrap">
@@ -1738,7 +1750,7 @@ function switchAccountTab(tab, el) {
 
 function _populateTransferSelects() {
   const opts = accountsData.map(a =>
-    `<option value="${a.id}">${a.name} (${a.type === 'current' ? 'Current' : 'Savings'})</option>`).join('');
+    `<option value="${a.id}">${esc(a.name)} (${a.type === 'current' ? 'Current' : 'Savings'})</option>`).join('');
   ['acc-transfer-from','acc-transfer-to'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = opts || '<option value="">— add accounts first —</option>';
@@ -1758,7 +1770,7 @@ function saveAccount() {
   const note        = document.getElementById('acc-note').value.trim();
   if (!name) { toast('Please enter an account name.'); return; }
   const isEdit = !!editingAccountId;
-  const id     = editingAccountId || Date.now();
+  const id     = editingAccountId || genId();
   const account = { id, name, type, balance, interestRate, note };
   if (isEdit) { const i = accountsData.findIndex(a => a.id === id); if (i > -1) accountsData[i] = account; }
   else accountsData.push(account);
@@ -1829,7 +1841,7 @@ function saveTransfer() {
   if (!amount || amount<=0) { toast('Please enter a valid amount.'); return; }
   if (!startDate)           { toast('Please enter a start date.'); return; }
   const isEdit   = !!editingTransferId;
-  const id       = editingTransferId || Date.now();
+  const id       = editingTransferId || genId();
   const transfer = { id, fromAccountId: fromId, toAccountId: toId, amount, frequency, startDate, endDate: endDate || null, note };
   if (isEdit) { const i = savingsTransfers.findIndex(t => t.id === id); if (i > -1) savingsTransfers[i] = transfer; }
   else savingsTransfers.push(transfer);
@@ -1908,10 +1920,10 @@ function renderAccountsPage() {
         <div class="acc-account-info">
           <div class="acc-account-name">
             <span class="badge ${a.type==='current'?'badge-freq':'badge-income'}">${a.type==='current'?'🏦 Current':'💰 Savings'}</span>
-            ${a.name}
+            ${esc(a.name)}
           </div>
           ${a.interestRate != null ? `<div class="acc-account-sub">${a.interestRate}% AER · interest compounded monthly</div>` : ''}
-          ${a.note ? `<div class="acc-account-sub text-muted">${a.note}</div>` : ''}
+          ${a.note ? `<div class="acc-account-sub text-muted">${esc(a.note)}</div>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:12px">
           <div class="acc-account-balance">${fmt(a.balance)}</div>
@@ -1929,13 +1941,13 @@ function renderAccountsPage() {
           const fromAcc = accountsData.find(a => a.id === t.fromAccountId);
           const toAcc   = accountsData.find(a => a.id === t.toAccountId);
           return `<tr>
-            <td>${fromAcc ? fromAcc.name : '<span class="text-muted">deleted</span>'}</td>
-            <td>${toAcc   ? toAcc.name   : '<span class="text-muted">deleted</span>'}</td>
+            <td>${fromAcc ? esc(fromAcc.name) : '<span class="text-muted">deleted</span>'}</td>
+            <td>${toAcc   ? esc(toAcc.name)   : '<span class="text-muted">deleted</span>'}</td>
             <td class="text-expense">${fmt(t.amount)}</td>
             <td><span class="badge badge-freq">${FREQ_LABELS[t.frequency]||t.frequency}</span></td>
             <td>${formatDate(t.startDate)}</td>
             <td>${t.endDate ? formatDate(t.endDate) : '—'}</td>
-            <td class="text-muted">${t.note || '—'}</td>
+            <td class="text-muted">${esc(t.note || '—')}</td>
             <td style="white-space:nowrap">
               <button class="btn-sm-ghost" onclick="editTransfer(${t.id})" style="margin-right:4px">Edit</button>
               <button class="btn-sm-danger" onclick="deleteTransfer(${t.id})">Delete</button>
