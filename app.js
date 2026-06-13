@@ -9,111 +9,21 @@ import {
 import {
   getOccurrenceDates, getAmountForMonth, generateProjection,
 } from './js/engine.js';
-
-// ══════════════════════════════════════════════════
-//  DATA
-// ══════════════════════════════════════════════════
-let incomeData       = JSON.parse(localStorage.getItem('mf_income')    || '[]');
-let expenseData      = JSON.parse(localStorage.getItem('mf_expenses')  || '[]');
-let recurringData    = JSON.parse(localStorage.getItem('mf_recurring') || '[]');
-let creditCards      = JSON.parse(localStorage.getItem('mf_cards')     || '[]');
-let interestFreeDeals= JSON.parse(localStorage.getItem('mf_deals')     || '[]');
-// Load CC transactions, defaulting legacy entries (no type field) to 'charge'
-let ccTransactions = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]')
-  .map(t => ({ ...t, type: t.type || 'charge' }));
-let loansData        = JSON.parse(localStorage.getItem('mf_loans')             || '[]');
-let accountsData     = JSON.parse(localStorage.getItem('mf_accounts')          || '[]');
-let savingsTransfers = JSON.parse(localStorage.getItem('mf_savings_transfers') || '[]');
-
-// One-time migration: absorb any entries saved under the old separate CC payments key
-(function migrateCCPayments() {
-  const old = JSON.parse(localStorage.getItem('mf_cc_payments') || '[]');
-  if (!old.length) return;
-  old.forEach(p => { if (!ccTransactions.find(t => t.id === p.id)) ccTransactions.push({ ...p, type: 'payment', category: 'CC Payment' }); });
-  localStorage.removeItem('mf_cc_payments');
-  localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
-})();
-
-function saveData() {
-  localStorage.setItem('mf_income',    JSON.stringify(incomeData));
-  localStorage.setItem('mf_expenses',  JSON.stringify(expenseData));
-  localStorage.setItem('mf_recurring', JSON.stringify(recurringData));
-  localStorage.setItem('mf_cards',     JSON.stringify(creditCards));
-  localStorage.setItem('mf_deals',           JSON.stringify(interestFreeDeals));
-  localStorage.setItem('mf_cc_transactions', JSON.stringify(ccTransactions));
-  localStorage.setItem('mf_loans',             JSON.stringify(loansData));
-  localStorage.setItem('mf_accounts',          JSON.stringify(accountsData));
-  localStorage.setItem('mf_savings_transfers', JSON.stringify(savingsTransfers));
-}
-
-// ══════════════════════════════════════════════════
-//  SUPABASE — client, field mapping, data layer, auth
-// ══════════════════════════════════════════════════
-const _sbCreate = (window.supabase || {}).createClient;
-const db = _sbCreate
-  ? _sbCreate('https://acqiduorpzwwegzaijdc.supabase.co', 'sb_publishable_BNdn9Z-B74oF3XrRZlu-Rw_ePCyaU2f')
-  : null;
-let currentUser = null;
-
-// ── Field mapping (camelCase JS ↔ snake_case DB) ──
-function toDbIncome(r)      { return { id: r.id, date: r.date, category: r.category, amount: r.amount, description: r.description || null }; }
-function fromDbIncome(r)    { return { id: r.id, date: r.date, category: r.category, amount: parseFloat(r.amount), description: r.description }; }
-function toDbRecurring(r)   { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: r.amount, frequency: r.frequency, start_date: r.startDate, end_date: r.endDate || null, active_months: r.activeMonths || null }; }
-function fromDbRecurring(r) { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: parseFloat(r.amount), frequency: r.frequency, startDate: r.start_date, endDate: r.end_date, activeMonths: r.active_months || null }; }
-function toDbCard(c)        { return { id: c.id, name: c.name, balance: c.balance, apr: c.apr, min_type: c.minType, min_pct: c.minPct || null, min_floor: c.minFloor || null, min_fixed: c.minFixed || null, credit_limit: c.creditLimit || null }; }
-function fromDbCard(c)      { return { id: c.id, name: c.name, balance: parseFloat(c.balance), apr: parseFloat(c.apr), minType: c.min_type, minPct: c.min_pct ? parseFloat(c.min_pct) : null, minFloor: c.min_floor ? parseFloat(c.min_floor) : null, minFixed: c.min_fixed ? parseFloat(c.min_fixed) : null, creditLimit: c.credit_limit ? parseFloat(c.credit_limit) : null }; }
-function toDbDeal(d)        { return { id: d.id, card_id: d.cardId, amount: d.amount, start_date: d.startDate, end_date: d.endDate, note: d.note || null }; }
-function fromDbDeal(d)      { return { id: d.id, cardId: d.card_id, amount: parseFloat(d.amount), startDate: d.start_date, endDate: d.end_date, note: d.note }; }
-function toDbCCT(t)         { return { id: t.id, card_id: t.cardId, date: t.date, amount: t.amount, category: t.category, description: t.description || null, type: t.type }; }
-function fromDbCCT(t)       { return { id: t.id, cardId: t.card_id, date: t.date, amount: parseFloat(t.amount), category: t.category, description: t.description, type: t.type || 'charge' }; }
-function toDbLoan(l)        { return { id: l.id, lender: l.lender, total_amount: l.totalAmount, repayment_amount: l.repaymentAmount, apr: l.apr || null, frequency: l.frequency, start_date: l.startDate, end_date: l.endDate || null, note: l.note || null }; }
-function fromDbLoan(l)      { return { id: l.id, lender: l.lender, totalAmount: parseFloat(l.total_amount), repaymentAmount: parseFloat(l.repayment_amount), apr: l.apr ? parseFloat(l.apr) : null, frequency: l.frequency, startDate: l.start_date, endDate: l.end_date, note: l.note }; }
-function toDbAccount(a)     { return { id: a.id, name: a.name, type: a.type, balance: a.balance, interest_rate: a.interestRate || null, note: a.note || null }; }
-function fromDbAccount(a)   { return { id: a.id, name: a.name, type: a.type, balance: parseFloat(a.balance), interestRate: a.interest_rate ? parseFloat(a.interest_rate) : null, note: a.note }; }
-function toDbTransfer(t)    { return { id: t.id, from_account_id: t.fromAccountId, to_account_id: t.toAccountId, amount: t.amount, frequency: t.frequency, start_date: t.startDate, end_date: t.endDate || null, note: t.note || null }; }
-function fromDbTransfer(t)  { return { id: t.id, fromAccountId: t.from_account_id, toAccountId: t.to_account_id, amount: parseFloat(t.amount), frequency: t.frequency, startDate: t.start_date, endDate: t.end_date, note: t.note }; }
-
-// ── Generic DB helpers ──
-async function dbUpsert(table, jsObj, toDbFn) {
-  if (!currentUser || !db) return;
-  const { error } = await db.from(table).upsert({ ...toDbFn(jsObj), user_id: currentUser.id });
-  if (error) { console.error('dbUpsert', table, error); toast('⚠️ Sync failed — saved locally but not to cloud.'); }
-}
-async function dbDelete(table, id) {
-  if (!currentUser || !db) return;
-  const { error } = await db.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error) { console.error('dbDelete', table, error); toast('⚠️ Sync failed — deletion saved locally but not to cloud.'); }
-}
-
-// ── Load all data for signed-in user ──
-async function loadUserData() {
-  const uid = currentUser.id;
-  try {
-    const [inc, exp, rec, cards, deals, cct, loans, accs, transfers] = await Promise.all([
-      db.from('income').select('*').eq('user_id', uid),
-      db.from('expenses').select('*').eq('user_id', uid),
-      db.from('recurring').select('*').eq('user_id', uid),
-      db.from('credit_cards').select('*').eq('user_id', uid),
-      db.from('promo_deals').select('*').eq('user_id', uid),
-      db.from('cc_transactions').select('*').eq('user_id', uid),
-      db.from('loans').select('*').eq('user_id', uid),
-      db.from('accounts').select('*').eq('user_id', uid),
-      db.from('savings_transfers').select('*').eq('user_id', uid),
-    ]);
-    incomeData        = (inc.data       || []).map(fromDbIncome);
-    expenseData       = (exp.data       || []).map(fromDbIncome);
-    recurringData     = (rec.data       || []).map(fromDbRecurring);
-    creditCards       = (cards.data     || []).map(fromDbCard);
-    interestFreeDeals = (deals.data     || []).map(fromDbDeal);
-    ccTransactions    = (cct.data       || []).map(fromDbCCT);
-    loansData         = (loans.data     || []).map(fromDbLoan);
-    accountsData      = (accs.data      || []).map(fromDbAccount);
-    savingsTransfers  = (transfers.data || []).map(fromDbTransfer);
-  } catch (err) {
-    console.error('loadUserData failed', err);
-    toast('⚠️ Could not load your cloud data — showing locally saved data instead.');
-  }
-}
+import {
+  db, currentUser, setCurrentUser,
+  incomeData, setIncomeData,
+  expenseData, setExpenseData,
+  recurringData, setRecurringData,
+  creditCards, setCreditCards,
+  interestFreeDeals, setInterestFreeDeals,
+  ccTransactions, setCCTransactions,
+  loansData, setLoansData,
+  accountsData, setAccountsData,
+  savingsTransfers, setSavingsTransfers,
+  saveData, loadUserData,
+  toDbIncome, toDbRecurring, toDbCard, toDbDeal, toDbCCT, toDbLoan, toDbAccount, toDbTransfer,
+  dbUpsert, dbDelete,
+} from './js/data.js';
 
 // ── Auth functions ──
 async function signInWithGoogle() {
@@ -479,8 +389,8 @@ function addOneoff() {
   document.getElementById('oneoff-amount').value=''; document.getElementById('oneoff-description').value='';
 }
 
-function deleteIncome(id)  { incomeData =incomeData.filter(r=>r.id!==id);  dbDelete('income', id);   saveData(); renderOneoffList(); toast('🗑 Deleted'); }
-function deleteExpense(id) { expenseData=expenseData.filter(r=>r.id!==id); dbDelete('expenses', id); saveData(); renderOneoffList(); toast('🗑 Deleted'); }
+function deleteIncome(id)  { setIncomeData(incomeData.filter(r=>r.id!==id));   dbDelete('income', id);   saveData(); renderOneoffList(); toast('🗑 Deleted'); }
+function deleteExpense(id) { setExpenseData(expenseData.filter(r=>r.id!==id)); dbDelete('expenses', id); saveData(); renderOneoffList(); toast('🗑 Deleted'); }
 
 function renderOneoffList() {
   const tbody = document.getElementById('oneoff-table-body');
@@ -640,7 +550,7 @@ function clearRecurringForm() {
 }
 
 function deleteRecurring(id) {
-  recurringData = recurringData.filter(r => r.id !== id);
+  setRecurringData(recurringData.filter(r => r.id !== id));
   dbDelete('recurring', id);
   saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted');
 }
@@ -830,7 +740,7 @@ function saveCard() {
   if (minType==='percent'&&(isNaN(minPct)||minPct<=0)) { toast('⚠️ Enter a valid minimum %'); return; }
   if (minType==='fixed'&&(isNaN(minFixed)||minFixed<=0)){ toast('⚠️ Enter a valid fixed payment'); return; }
   const card={ id:editId?parseInt(editId):genId(), name, balance, apr, minType, minPct, minFloor, minFixed, creditLimit };
-  if (editId) creditCards=creditCards.map(c=>c.id===card.id?card:c); else creditCards.push(card);
+  if (editId) setCreditCards(creditCards.map(c=>c.id===card.id?card:c)); else creditCards.push(card);
   dbUpsert('credit_cards', card, toDbCard);
   saveData(); renderCardList(); clearCardForm(); toast(editId?'✅ Card updated!':'✅ Card saved!');
   if (window.posthog) posthog.capture('card_saved', { is_edit: !!editId, min_type: minType });
@@ -865,9 +775,9 @@ function deleteCard(id) {
   if (interestFreeDeals.some(d=>d.cardId===id)) {
     if (!confirm('This card has interest-free deals linked to it. Deleting the card will also remove those deals. Continue?')) return;
     interestFreeDeals.filter(d=>d.cardId===id).forEach(d => dbDelete('promo_deals', d.id));
-    interestFreeDeals=interestFreeDeals.filter(d=>d.cardId!==id);
+    setInterestFreeDeals(interestFreeDeals.filter(d=>d.cardId!==id));
   }
-  creditCards=creditCards.filter(c=>c.id!==id);
+  setCreditCards(creditCards.filter(c=>c.id!==id));
   dbDelete('credit_cards', id);
   saveData(); renderCardList(); toast('🗑 Card deleted');
 }
@@ -1028,7 +938,7 @@ function saveDeal() {
   if (end <= start)             { toast('⚠️ End date must be after start date'); return; }
 
   const deal = { id: editId ? parseInt(editId) : genId(), cardId, amount, startDate: start, endDate: end, note };
-  if (editId) interestFreeDeals = interestFreeDeals.map(d => d.id === deal.id ? deal : d);
+  if (editId) setInterestFreeDeals(interestFreeDeals.map(d => d.id === deal.id ? deal : d));
   else        interestFreeDeals.push(deal);
   dbUpsert('promo_deals', deal, toDbDeal);
   saveData(); clearDealForm(); renderDealsPage(); toast(editId ? '✅ Deal updated!' : '✅ Deal saved!');
@@ -1062,7 +972,7 @@ function editDeal(id) {
 }
 
 function deleteDeal(id) {
-  interestFreeDeals = interestFreeDeals.filter(d => d.id !== id);
+  setInterestFreeDeals(interestFreeDeals.filter(d => d.id !== id));
   dbDelete('promo_deals', id);
   saveData(); renderDealsPage(); toast('🗑 Deal deleted');
 }
@@ -1194,7 +1104,7 @@ function cancelLoanEdit() {
 }
 
 function deleteLoan(id) {
-  loansData = loansData.filter(l => l.id !== id);
+  setLoansData(loansData.filter(l => l.id !== id));
   dbDelete('loans', id);
   saveData();
   renderLoansPage();
@@ -1306,7 +1216,7 @@ function addCCTransaction() {
 }
 
 function deleteCCTransaction(id) {
-  ccTransactions = ccTransactions.filter(t => t.id !== id);
+  setCCTransactions(ccTransactions.filter(t => t.id !== id));
   dbDelete('cc_transactions', id);
   saveData(); renderCCTransactions(); renderOneoffList(); toast('🗑 Deleted');
 }
@@ -1327,7 +1237,7 @@ function saveCCTEdit(id) {
   if (!date)                        { toast('⚠️ Pick a date'); return; }
   if (!cardId || isNaN(cardId))    { toast('⚠️ Select a card'); return; }
   if (isNaN(amount) || amount <= 0) { toast('⚠️ Enter a valid amount'); return; }
-  ccTransactions = ccTransactions.map(t => t.id === id ? { ...t, date, cardId, category: cat, description: desc || cat, amount } : t);
+  setCCTransactions(ccTransactions.map(t => t.id === id ? { ...t, date, cardId, category: cat, description: desc || cat, amount } : t));
   const updatedTxn = ccTransactions.find(t => t.id === id);
   if (updatedTxn) dbUpsert('cc_transactions', updatedTxn, toDbCCT);
   saveData(); editingCCTId = null; renderCCTransactions(); toast('✅ Updated!');
@@ -1520,9 +1430,9 @@ function cancelAccountEdit() {
 
 function deleteAccount(id) {
   if (!confirm('Delete this account? Any transfers involving it will also be removed.')) return;
-  accountsData     = accountsData.filter(a => a.id !== id);
-  const orphans    = savingsTransfers.filter(t => t.fromAccountId === id || t.toAccountId === id);
-  savingsTransfers = savingsTransfers.filter(t => t.fromAccountId !== id && t.toAccountId !== id);
+  setAccountsData(accountsData.filter(a => a.id !== id));
+  const orphans = savingsTransfers.filter(t => t.fromAccountId === id || t.toAccountId === id);
+  setSavingsTransfers(savingsTransfers.filter(t => t.fromAccountId !== id && t.toAccountId !== id));
   orphans.forEach(t => dbDelete('savings_transfers', t.id));
   saveData();
   dbDelete('accounts', id);
@@ -1590,7 +1500,7 @@ function cancelTransferEdit() {
 
 function deleteTransfer(id) {
   if (!confirm('Delete this transfer?')) return;
-  savingsTransfers = savingsTransfers.filter(t => t.id !== id);
+  setSavingsTransfers(savingsTransfers.filter(t => t.id !== id));
   saveData();
   dbDelete('savings_transfers', id);
   renderAccountsPage();
@@ -1785,7 +1695,7 @@ renderOneoffList();
 
   // Shared app-init: called once a user session is confirmed.
   async function _initApp(user) {
-    currentUser = user;
+    setCurrentUser(user);
     _applyCurrencyFromUser(currentUser);
     await loadUserData();
     const hasLocalData = ['mf_income','mf_expenses','mf_recurring'].some(k => {
@@ -1806,7 +1716,7 @@ renderOneoffList();
     db.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') await _initApp(session.user);
       else if (event === 'SIGNED_OUT' && currentUser) {
-        currentUser = null; updateUserUI(); window.location.reload();
+        setCurrentUser(null); updateUserUI(); window.location.reload();
       }
     });
     return; // _initApp called by the listener above; nothing more to do here
@@ -1828,7 +1738,7 @@ renderOneoffList();
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && !currentUser) await _initApp(session.user);
     else if (event === 'SIGNED_OUT' && currentUser) {
-      currentUser = null; updateUserUI(); window.location.reload();
+      setCurrentUser(null); updateUserUI(); window.location.reload();
     }
   });
 })();
