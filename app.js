@@ -353,6 +353,53 @@ function formatDate(ds) {
 function formatMonthYear(y, m) {
   return new Date(y, m, 1).toLocaleString('en-GB', { month: 'short', year: 'numeric' });
 }
+
+// ── CSV export utility ────────────────────────────────────────────────────────
+function exportCSV(filename, headers, rowsData) {
+  const esc = v => { const s = String(v ?? ''); return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s; };
+  const lines = [headers.map(esc).join(','), ...rowsData.map(r => r.map(esc).join(','))];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function exportRecurring() {
+  const rows = recurringData.map(r => [
+    r.type, r.name, r.category, r.amount, r.frequency,
+    monthlyEquiv(r).toFixed(2),
+    r.startDate, r.endDate || '',
+    r.activeMonths && r.activeMonths.length > 0 && r.activeMonths.length < 12 ? r.activeMonths.map(m => REC_MONTH_NAMES[m]).join(';') : 'All'
+  ]);
+  exportCSV('recurring-transactions.csv', ['Type','Name','Category','Amount','Frequency','Monthly Equiv (£)','Start Date','End Date','Active Months'], rows);
+}
+function exportOneoffs() {
+  let items = [];
+  if (currentOneoffFilter !== 'expense') incomeData.forEach(r  => items.push({...r, type:'income'}));
+  if (currentOneoffFilter !== 'income')  expenseData.forEach(r => items.push({...r, type:'expense'}));
+  if (currentOneoffFilter !== 'income') {
+    ccTransactions.filter(t => t.type === 'payment').forEach(t => {
+      const card = creditCards.find(c => c.id === t.cardId);
+      items.push({ date: t.date, type: 'expense', category: 'CC Payment',
+        description: t.description ? `${t.description} (${card?card.name:'Unknown'})` : `Payment to ${card?card.name:'Unknown'}`,
+        amount: t.amount });
+    });
+  }
+  items.sort((a,b) => new Date(b.date)-new Date(a.date));
+  exportCSV('one-off-transactions.csv', ['Date','Type','Category','Description','Amount'],
+    items.map(r => [r.date, r.type, r.category, r.description, r.amount]));
+}
+function exportCCTransactions() {
+  const rows = (currentCCTFilter === 'all'
+    ? [...ccTransactions]
+    : ccTransactions.filter(t => String(t.cardId) === currentCCTFilter)
+  ).sort((a,b) => new Date(b.date)-new Date(a.date))
+   .map(t => {
+     const card = creditCards.find(c => c.id === t.cardId);
+     return [t.date, t.type === 'payment' ? 'Payment' : 'Charge', card ? card.name : '', t.category || '', t.description, t.amount];
+   });
+  exportCSV('cc-transactions.csv', ['Date','Type','Card','Category','Description','Amount'], rows);
+}
 function isThisMonthOrFuture(ds) {
   const now = new Date(); const d = new Date(ds + 'T00:00:00');
   return d.getFullYear() > now.getFullYear() || (d.getFullYear() === now.getFullYear() && d.getMonth() >= now.getMonth());
@@ -868,11 +915,12 @@ function editRecurring(id) {
 function cancelRecurringEdit() { clearRecurringForm(); }
 
 function clearRecurringForm() {
+  const preservedType = currentRecType; // remember what was selected before clearing
   editingRecurringId = null;
   ['rec-name','rec-amount','rec-end'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('rec-frequency').value = 'monthly';
   document.getElementById('rec-category').value  = 'Salary';
-  setRecType('income');
+  setRecType(preservedType); // stay on the same income/expense type
   onRecFrequencyChange();
   _setActiveMonths(null);
   document.getElementById('rec-form-title').textContent   = 'Add Recurring Transaction';
