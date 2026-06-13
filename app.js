@@ -31,6 +31,7 @@ import {
   toggleAccountMenu,
   showMigrationBanner, dismissMigration,
   launchApp, showSignInOverlay, checkFirstVisit,
+  migrateFromLocalStorage,
 } from './js/auth.js';
 import {
   renderDashboard, renderOneoffList,
@@ -42,35 +43,6 @@ import {
   editingCCTId, setEditingCCTId,
   editingLoanId, setEditingLoanId,
 } from './js/render.js';
-async function migrateFromLocalStorage() {
-  if (!currentUser) return;
-  toast('⏳ Importing your data…');
-  const uid = currentUser.id;
-  try {
-    const lsIncome    = JSON.parse(localStorage.getItem('mf_income')          || '[]');
-    const lsExpenses  = JSON.parse(localStorage.getItem('mf_expenses')        || '[]');
-    const lsRecurring = JSON.parse(localStorage.getItem('mf_recurring')       || '[]');
-    const lsCards     = JSON.parse(localStorage.getItem('mf_cards')           || '[]');
-    const lsDeals     = JSON.parse(localStorage.getItem('mf_deals')           || '[]');
-    const lsCCT       = JSON.parse(localStorage.getItem('mf_cc_transactions') || '[]');
-    const lsLoans     = JSON.parse(localStorage.getItem('mf_loans')           || '[]');
-    if (lsCards.length)     await db.from('credit_cards').upsert(lsCards.map(c => ({ ...toDbCard(c), user_id: uid })));
-    if (lsIncome.length)    await db.from('income').upsert(lsIncome.map(r => ({ ...toDbIncome(r), user_id: uid })));
-    if (lsExpenses.length)  await db.from('expenses').upsert(lsExpenses.map(r => ({ ...toDbIncome(r), user_id: uid })));
-    if (lsRecurring.length) await db.from('recurring').upsert(lsRecurring.map(r => ({ ...toDbRecurring(r), user_id: uid })));
-    if (lsDeals.length)     await db.from('promo_deals').upsert(lsDeals.map(d => ({ ...toDbDeal(d), user_id: uid })));
-    if (lsCCT.length)       await db.from('cc_transactions').upsert(lsCCT.map(t => ({ ...toDbCCT(t), user_id: uid })));
-    if (lsLoans.length)     await db.from('loans').upsert(lsLoans.map(l => ({ ...toDbLoan(l), user_id: uid })));
-    ['mf_income','mf_expenses','mf_recurring','mf_cards','mf_deals','mf_cc_transactions','mf_loans'].forEach(k => localStorage.removeItem(k));
-    await loadUserData();
-    dismissMigration();
-    renderDashboard(); renderOneoffList();
-    toast('✅ Data imported successfully!');
-  } catch (err) {
-    console.error('Migration error:', err);
-    toast('⚠️ Import failed — please try again');
-  }
-}
 
 // ══════════════════════════════════════════════════
 //  NAVIGATION
