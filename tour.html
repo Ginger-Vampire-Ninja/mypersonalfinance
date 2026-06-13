@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>How Finaura Works — Feature Tour</title>
+  <meta name="description" content="A guided tour of Finaura's features: cashflow forecasting, credit card tracking, recurring transactions, loans and more."/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a12; color: #e5e7eb; min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; border-bottom: 1px solid rgba(255,255,255,0.07); position: sticky; top: 0; background: #0a0a12; z-index: 10; }
+    .nav-logo { display: flex; align-items: center; }
+    .nav-links { display: flex; align-items: center; gap: 20px; }
+    .nav-back { color: #9ca3af; font-size: 0.88rem; transition: color 0.15s; }
+    .nav-back:hover { color: #2DD4BF; }
+    .nav-cta { background: #0F766E; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 0.15s; text-decoration: none; display: inline-block; }
+    .nav-cta:hover { background: #0D6560; }
+
+    /* ── Hero ── */
+    .hero { text-align: center; padding: 80px 24px 60px; max-width: 700px; margin: 0 auto; }
+    .hero-badge { display: inline-block; background: rgba(15,118,110,0.2); color: #2DD4BF; border: 1px solid rgba(15,118,110,0.4); border-radius: 20px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 14px; margin-bottom: 24px; }
+    .hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.2; letter-spacing: -0.5px; margin-bottom: 18px; }
+    .hero h1 span { color: #2DD4BF; }
+    .hero p { font-size: 1.05rem; color: #9ca3af; line-height: 1.7; max-width: 520px; margin: 0 auto 36px; }
+    .hero-cta { display: inline-block; background: #0F766E; color: #fff; padding: 14px 32px; border-radius: 10px; font-size: 1rem; font-weight: 700; transition: background 0.15s; }
+    .hero-cta:hover { background: #0D6560; }
+
+    /* ── Feature sections ── */
+    .features { max-width: 1060px; margin: 0 auto; padding: 0 24px 80px; }
+    .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; padding: 72px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+    .feature.reverse { direction: rtl; }
+    .feature.reverse > * { direction: ltr; }
+    .feature-label { display: inline-block; background: rgba(45,212,191,0.1); color: #2DD4BF; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 4px 10px; border-radius: 4px; margin-bottom: 14px; }
+    .feature h2 { font-size: 1.6rem; font-weight: 800; line-height: 1.25; margin-bottom: 16px; letter-spacing: -0.3px; }
+    .feature p { font-size: 0.95rem; color: #9ca3af; line-height: 1.75; margin-bottom: 14px; }
+    .feature ul { margin: 0 0 14px 0; padding: 0; list-style: none; }
+    .feature ul li { font-size: 0.92rem; color: #9ca3af; line-height: 1.7; padding-left: 20px; position: relative; }
+    .feature ul li::before { content: '✓'; position: absolute; left: 0; color: #2DD4BF; font-weight: 700; }
+    .mockup { background: #0e0e1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+    .mockup-bar { background: #13131f; border-bottom: 1px solid rgba(255,255,255,0.07); padding: 10px 14px; display: flex; gap: 6px; align-items: center; }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .mockup-title { font-size: 0.72rem; color: #4b5563; margin-left: 8px; font-weight: 600; letter-spacing: 0.3px; }
+    .mockup svg { display: block; width: 100%; height: auto; }
+
+    /* ── Bottom CTA ── */
+    .bottom-cta { text-align: center; padding: 80px 24px; background: rgba(15,118,110,0.07); border-top: 1px solid rgba(15,118,110,0.15); }
+    .bottom-cta h2 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
+    .bottom-cta p { color: #9ca3af; margin-bottom: 32px; font-size: 1rem; }
+    .bottom-cta-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary { display: inline-block; background: #0F766E; color: #fff; padding: 14px 32px; border-radius: 10px; font-size: 1rem; font-weight: 700; transition: background 0.15s; }
+    .btn-primary:hover { background: #0D6560; }
+    .btn-ghost { display: inline-block; color: #9ca3af; border: 1.5px solid rgba(255,255,255,0.15); padding: 14px 28px; border-radius: 10px; font-size: 1rem; font-weight: 600; transition: border-color 0.15s, color 0.15s; }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    /* ── Footer ── */
+    footer { text-align: center; padding: 20px 24px 32px; color: #4b5563; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06); }
+    footer a { color: #6b7280; text-decoration: underline; }
+
+    /* ── Responsive ── */
+    @media (max-width: 720px) {
+      nav { padding: 14px 20px; }
+      .feature { grid-template-columns: 1fr; gap: 32px; padding: 48px 0; }
+      .feature.reverse { direction: ltr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <svg viewBox="0 0 158 34" height="28" xmlns="http://www.w3.org/2000/svg" aria-label="Finaura">
+      <rect x="0" y="1" width="32" height="32" rx="7" fill="#0F766E"/>
+      <rect x="8" y="9" width="16" height="3" rx="1.5" fill="white"/>
+      <rect x="8" y="9" width="3" height="17" rx="1.5" fill="white"/>
+      <rect x="8" y="16.5" width="12" height="3" rx="1.5" fill="white"/>
+      <polyline points="13.5,22 17.5,17.5 21.5,19 25.5,13.5" fill="none" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="25.5" cy="13.5" r="2" fill="#2DD4BF"/>
+      <text x="40" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5"><tspan fill="white">Fin</tspan><tspan fill="#2DD4BF">aura</tspan></text>
+    </svg>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-back">← Back to home</a>
+    <a href="index.html" class="nav-cta">Get started — Free</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge">Feature Tour</div>
+  <h1>See exactly what <span>Finaura</span> can do</h1>
+  <p>A quick walk through every feature — from forecasting your cashflow months ahead to tracking every credit card and loan in one place.</p>
+  <a href="index.html" class="hero-cta">Start for free →</a>
+</div>
+
+<div class="features">
+
+  <!-- ── 1. Cashflow Forecasting ── -->
+  <div class="feature">
+    <div class="feature-text">
+      <div class="feature-label">Cashflow Forecasting</div>
+      <h2>Know exactly where you stand, months from now</h2>
+      <p>Finaura builds a rolling 12–24 month cashflow table automatically. Every recurring payment, one-off transaction, credit card repayment and loan instalment is factored in — no manual number-crunching required.</p>
+      <ul>
+        <li>Month-by-month income vs. expenditure breakdown</li>
+        <li>Running balance so you can spot a tight month early</li>
+        <li>Colour-coded net cashflow — green for surplus, red for deficit</li>
+        <li>Hover any cell for a full breakdown of what's included</li>
+      </ul>
+    </div>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="mockup-dot" style="background:#ef4444"></div>
+        <div class="mockup-dot" style="background:#f59e0b"></div>
+        <div class="mockup-dot" style="background:#22c55e"></div>
+        <span class="mockup-title">Cashflow Projection</span>
+      </div>
+      <svg viewBox="0 0 460 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- Table header -->
+        <rect x="0" y="0" width="460" height="32" fill="#13131f"/>
+        <text x="12" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">MONTH</text>
+        <text x="110" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">REC. INCOME</text>
+        <text x="195" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">REC. EXP.</text>
+        <text x="275" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">NET CASHFLOW</text>
+        <text x="385" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">RUNNING TOTAL</text>
+        <!-- Row 1 -->
+        <rect x="0" y="32" width="460" height="30" fill="#0e0e1a"/>
+        <text x="12" y="52" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Jun 2026</text>
+        <text x="110" y="52" font-family="system-ui,sans-serif" font-size="11" fill="#34d399">£3,200.00</text>
+        <text x="195" y="52" font-family="system-ui,sans-serif" font-size="11" fill="#f87171">£1,850.00</text>
+        <rect x="268" y="37" width="82" height="20" rx="4" fill="rgba(52,211,153,0.15)"/>
+        <text x="275" y="52" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#34d399">+£1,350.00</text>
+        <text x="385" y="52" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399">+£24,350.00</text>
+        <!-- Row 2 -->
+        <rect x="0" y="62" width="460" height="30" fill="rgba(255,255,255,0.015)"/>
+        <text x="12" y="82" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Jul 2026</text>
+        <text x="110" y="82" font-family="system-ui,sans-serif" font-size="11" fill="#34d399">£3,200.00</text>
+        <text x="195" y="82" font-family="system-ui,sans-serif" font-size="11" fill="#f87171">£2,100.00</text>
+        <rect x="268" y="67" width="82" height="20" rx="4" fill="rgba(52,211,153,0.15)"/>
+        <text x="275" y="82" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#34d399">+£1,100.00</text>
+        <text x="385" y="82" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399">+£25,450.00</text>
+        <!-- Row 3 -->
+        <rect x="0" y="92" width="460" height="30" fill="#0e0e1a"/>
+        <text x="12" y="112" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Aug 2026</text>
+        <text x="110" y="112" font-family="system-ui,sans-serif" font-size="11" fill="#34d399">£3,200.00</text>
+        <text x="195" y="112" font-family="system-ui,sans-serif" font-size="11" fill="#f87171">£3,400.00</text>
+        <rect x="268" y="97" width="82" height="20" rx="4" fill="rgba(248,113,113,0.15)"/>
+        <text x="275" y="112" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#f87171">-£200.00</text>
+        <text x="385" y="112" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#f87171">+£25,250.00</text>
+        <!-- Row 4 -->
+        <rect x="0" y="122" width="460" height="30" fill="rgba(255,255,255,0.015)"/>
+        <text x="12" y="142" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Sep 2026</text>
+        <text x="110" y="142" font-family="system-ui,sans-serif" font-size="11" fill="#34d399">£3,200.00</text>
+        <text x="195" y="142" font-family="system-ui,sans-serif" font-size="11" fill="#f87171">£1,850.00</text>
+        <rect x="268" y="127" width="82" height="20" rx="4" fill="rgba(52,211,153,0.15)"/>
+        <text x="275" y="142" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#34d399">+£1,350.00</text>
+        <text x="385" y="142" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399">+£26,600.00</text>
+        <!-- Row 5 -->
+        <rect x="0" y="152" width="460" height="30" fill="#0e0e1a"/>
+        <text x="12" y="172" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Oct 2026</text>
+        <text x="110" y="172" font-family="system-ui,sans-serif" font-size="11" fill="#34d399">£3,200.00</text>
+        <text x="195" y="172" font-family="system-ui,sans-serif" font-size="11" fill="#f87171">£1,850.00</text>
+        <rect x="268" y="157" width="82" height="20" rx="4" fill="rgba(52,211,153,0.15)"/>
+        <text x="275" y="172" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#34d399">+£1,350.00</text>
+        <text x="385" y="172" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399">+£27,950.00</text>
+        <!-- Row 6 -->
+        <rect x="0" y="182" width="460" height="30" fill="rgba(255,255,255,0.015)"/>
+        <text x="12" y="202" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Nov 2026</text>
+        <text x="110" y="202" font-family="system-ui,sans-serif" font-size="11" fill="#34d399">£3,200.00</text>
+        <text x="195" y="202" font-family="system-ui,sans-serif" font-size="11" fill="#f87171">£1,850.00</text>
+        <rect x="268" y="187" width="82" height="20" rx="4" fill="rgba(52,211,153,0.15)"/>
+        <text x="275" y="202" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#34d399">+£1,350.00</text>
+        <text x="385" y="202" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399">+£29,300.00</text>
+        <!-- hint -->
+        <text x="12" y="248" font-family="system-ui,sans-serif" font-size="9" fill="#374151">Hover any cell for a detailed breakdown of what's included</text>
+        <!-- column dividers -->
+        <line x1="100" y1="0" x2="100" y2="220" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <line x1="185" y1="0" x2="185" y2="220" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <line x1="265" y1="0" x2="265" y2="220" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <line x1="375" y1="0" x2="375" y2="220" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── 2. Recurring Transactions ── -->
+  <div class="feature reverse">
+    <div class="feature-text">
+      <div class="feature-label">Recurring Transactions</div>
+      <h2>Set it once, tracked forever</h2>
+      <p>Add anything that repeats — salary, rent, gym membership, subscriptions — and Finaura factors it into every future month automatically. You can edit or cancel at any time.</p>
+      <ul>
+        <li>Weekly, fortnightly, monthly, quarterly or annual frequency</li>
+        <li>Irregular months — e.g. school-term costs that skip summer</li>
+        <li>Monthly equivalent shown for easy comparison across frequencies</li>
+        <li>Upcoming 60-day timeline so you always know what's coming</li>
+      </ul>
+    </div>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="mockup-dot" style="background:#ef4444"></div>
+        <div class="mockup-dot" style="background:#f59e0b"></div>
+        <div class="mockup-dot" style="background:#22c55e"></div>
+        <span class="mockup-title">Recurring Transactions</span>
+      </div>
+      <svg viewBox="0 0 460 256" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="460" height="32" fill="#13131f"/>
+        <text x="12" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">TYPE</text>
+        <text x="60" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">NAME</text>
+        <text x="175" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">AMOUNT</text>
+        <text x="240" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">FREQUENCY</text>
+        <text x="330" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">MONTHLY EQUIV.</text>
+        <!-- Row 1 income -->
+        <rect x="0" y="32" width="460" height="34" fill="#0e0e1a"/>
+        <rect x="12" y="41" width="38" height="16" rx="8" fill="rgba(52,211,153,0.15)"/>
+        <text x="18" y="53" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#34d399">income</text>
+        <text x="60" y="53" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Salary</text>
+        <text x="175" y="53" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">£3,200.00</text>
+        <rect x="238" y="41" width="56" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="245" y="53" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#2DD4BF">Monthly</text>
+        <text x="330" y="53" font-family="system-ui,sans-serif" font-size="11" fill="#9ca3af">£3,200.00/mo</text>
+        <!-- Row 2 expense -->
+        <rect x="0" y="66" width="460" height="34" fill="rgba(255,255,255,0.015)"/>
+        <rect x="12" y="75" width="42" height="16" rx="8" fill="rgba(248,113,113,0.15)"/>
+        <text x="17" y="87" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#f87171">expense</text>
+        <text x="60" y="87" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Rent</text>
+        <text x="175" y="87" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">£1,100.00</text>
+        <rect x="238" y="75" width="56" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="245" y="87" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#2DD4BF">Monthly</text>
+        <text x="330" y="87" font-family="system-ui,sans-serif" font-size="11" fill="#9ca3af">£1,100.00/mo</text>
+        <!-- Row 3 expense -->
+        <rect x="0" y="100" width="460" height="34" fill="#0e0e1a"/>
+        <rect x="12" y="109" width="42" height="16" rx="8" fill="rgba(248,113,113,0.15)"/>
+        <text x="17" y="121" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#f87171">expense</text>
+        <text x="60" y="117" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">School lunch</text>
+        <rect x="60" y="121" width="72" height="12" rx="6" fill="rgba(45,212,191,0.12)"/>
+        <text x="65" y="131" font-family="system-ui,sans-serif" font-size="8" fill="#2DD4BF">Sep, Oct, Nov, Jan, Feb</text>
+        <text x="175" y="121" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">£180.00</text>
+        <rect x="238" y="109" width="56" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="245" y="121" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#2DD4BF">Monthly</text>
+        <text x="330" y="121" font-family="system-ui,sans-serif" font-size="11" fill="#9ca3af">£180.00/mo</text>
+        <!-- Row 4 expense -->
+        <rect x="0" y="134" width="460" height="34" fill="rgba(255,255,255,0.015)"/>
+        <rect x="12" y="143" width="42" height="16" rx="8" fill="rgba(248,113,113,0.15)"/>
+        <text x="17" y="155" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#f87171">expense</text>
+        <text x="60" y="155" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Netflix</text>
+        <text x="175" y="155" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">£17.99</text>
+        <rect x="238" y="143" width="56" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="245" y="155" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#2DD4BF">Monthly</text>
+        <text x="330" y="155" font-family="system-ui,sans-serif" font-size="11" fill="#9ca3af">£17.99/mo</text>
+        <!-- Row 5 expense annual -->
+        <rect x="0" y="168" width="460" height="34" fill="#0e0e1a"/>
+        <rect x="12" y="177" width="42" height="16" rx="8" fill="rgba(248,113,113,0.15)"/>
+        <text x="17" y="189" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#f87171">expense</text>
+        <text x="60" y="189" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">Car Insurance</text>
+        <text x="175" y="189" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e5e7eb">£620.00</text>
+        <rect x="238" y="177" width="52" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="244" y="189" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#2DD4BF">Annually</text>
+        <text x="330" y="189" font-family="system-ui,sans-serif" font-size="11" fill="#9ca3af">£51.67/mo</text>
+        <line x1="0" y1="202" x2="460" y2="202" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── 3. Credit Card Tracker ── -->
+  <div class="feature">
+    <div class="feature-text">
+      <div class="feature-label">Credit Card Tracker</div>
+      <h2>All your cards in one place</h2>
+      <p>Add every card you hold, along with its balance, APR and any promotional 0% period. Finaura tracks minimum repayments and projects how your balances will change month by month.</p>
+      <ul>
+        <li>Credit limit utilisation bar — green, amber or red at a glance</li>
+        <li>0% interest-free deal tracker with days remaining</li>
+        <li>Log charges and payments against each card individually</li>
+        <li>Built-in payoff calculator: see how long minimum payments take vs. a fixed plan</li>
+      </ul>
+    </div>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="mockup-dot" style="background:#ef4444"></div>
+        <div class="mockup-dot" style="background:#f59e0b"></div>
+        <div class="mockup-dot" style="background:#22c55e"></div>
+        <span class="mockup-title">My Credit Cards</span>
+      </div>
+      <svg viewBox="0 0 460 260" xmlns="http://www.w3.org/2000/svg">
+        <!-- Card 1 -->
+        <rect x="12" y="14" width="436" height="68" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <text x="26" y="34" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#e5e7eb">Barclaycard Platinum</text>
+        <text x="26" y="50" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Balance: £1,240.00 / £3,000.00 limit</text>
+        <!-- util bar green -->
+        <rect x="26" y="57" width="200" height="6" rx="3" fill="rgba(255,255,255,0.08)"/>
+        <rect x="26" y="57" width="82" height="6" rx="3" fill="#22c55e"/>
+        <text x="232" y="64" font-family="system-ui,sans-serif" font-size="9" fill="#22c55e">41% used</text>
+        <text x="360" y="50" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">APR 22.9%</text>
+        <!-- Card 2 -->
+        <rect x="12" y="92" width="436" height="68" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <text x="26" y="112" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#e5e7eb">HSBC Balance Transfer</text>
+        <text x="26" y="128" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Balance: £2,850.00 / £4,000.00 limit</text>
+        <!-- util bar amber -->
+        <rect x="26" y="135" width="200" height="6" rx="3" fill="rgba(255,255,255,0.08)"/>
+        <rect x="26" y="135" width="142" height="6" rx="3" fill="#f59e0b"/>
+        <text x="232" y="142" font-family="system-ui,sans-serif" font-size="9" fill="#f59e0b">71% used</text>
+        <text x="340" y="112" font-family="system-ui,sans-serif" font-size="10" fill="#2DD4BF">0% — 142 days left</text>
+        <text x="360" y="128" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">APR 19.9%</text>
+        <!-- Card 3 -->
+        <rect x="12" y="170" width="436" height="68" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <text x="26" y="190" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#e5e7eb">Amex Gold</text>
+        <text x="26" y="206" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Balance: £3,680.00 / £4,000.00 limit</text>
+        <!-- util bar red -->
+        <rect x="26" y="213" width="200" height="6" rx="3" fill="rgba(255,255,255,0.08)"/>
+        <rect x="26" y="213" width="184" height="6" rx="3" fill="#ef4444"/>
+        <text x="232" y="220" font-family="system-ui,sans-serif" font-size="9" fill="#ef4444">92% used</text>
+        <text x="360" y="206" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">APR 30.0%</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── 4. One-off Transactions ── -->
+  <div class="feature reverse">
+    <div class="feature-text">
+      <div class="feature-label">One-off Transactions</div>
+      <h2>Log anything that doesn't repeat</h2>
+      <p>Holiday flights, a bonus payment, an unexpected car repair — add it once with a date and Finaura pulls it into the right month of your forecast automatically. Past entries build up your spending history.</p>
+      <ul>
+        <li>Future-dated entries appear in the cashflow forecast</li>
+        <li>Past entries kept as a historical record</li>
+        <li>Income and expense in the same view, filterable by type</li>
+        <li>Export all transactions to CSV with one click</li>
+      </ul>
+    </div>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="mockup-dot" style="background:#ef4444"></div>
+        <div class="mockup-dot" style="background:#f59e0b"></div>
+        <div class="mockup-dot" style="background:#22c55e"></div>
+        <span class="mockup-title">One-off Transactions</span>
+      </div>
+      <svg viewBox="0 0 460 230" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="460" height="32" fill="#13131f"/>
+        <text x="12" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">DATE</text>
+        <text x="90" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">TYPE</text>
+        <text x="148" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">DESCRIPTION</text>
+        <text x="310" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">AMOUNT</text>
+        <text x="385" y="21" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#4b5563" letter-spacing="0.8">FORECAST?</text>
+        <!-- Row 1 -->
+        <rect x="0" y="32" width="460" height="30" fill="#0e0e1a"/>
+        <text x="12" y="52" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">15 Aug 2026</text>
+        <rect x="88" y="39" width="16" height="16" rx="8" fill="rgba(248,113,113,0.15)"/>
+        <text x="91" y="51" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#f87171">exp</text>
+        <text x="148" y="52" font-family="system-ui,sans-serif" font-size="10" fill="#e5e7eb">Holiday flights — Mallorca</text>
+        <text x="310" y="52" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#f87171">-£342.00</text>
+        <rect x="383" y="39" width="58" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="390" y="51" font-family="system-ui,sans-serif" font-size="8" font-weight="600" fill="#2DD4BF">In forecast</text>
+        <!-- Row 2 -->
+        <rect x="0" y="62" width="460" height="30" fill="rgba(255,255,255,0.015)"/>
+        <text x="12" y="82" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">30 Jun 2026</text>
+        <rect x="88" y="69" width="30" height="16" rx="8" fill="rgba(52,211,153,0.15)"/>
+        <text x="92" y="81" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#34d399">income</text>
+        <text x="148" y="82" font-family="system-ui,sans-serif" font-size="10" fill="#e5e7eb">Q2 bonus</text>
+        <text x="310" y="82" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399">+£1,500.00</text>
+        <rect x="383" y="69" width="58" height="16" rx="8" fill="rgba(45,212,191,0.12)"/>
+        <text x="390" y="81" font-family="system-ui,sans-serif" font-size="8" font-weight="600" fill="#2DD4BF">In forecast</text>
+        <!-- Row 3 historical -->
+        <rect x="0" y="92" width="460" height="30" fill="#0e0e1a"/>
+        <text x="12" y="112" font-family="system-ui,sans-serif" font-size="10" fill="rgba(156,163,175,0.5)">3 May 2026</text>
+        <rect x="88" y="99" width="16" height="16" rx="8" fill="rgba(248,113,113,0.1)"/>
+        <text x="91" y="111" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="rgba(248,113,113,0.5)">exp</text>
+        <text x="148" y="112" font-family="system-ui,sans-serif" font-size="10" fill="rgba(229,231,235,0.4)">Car service &amp; MOT</text>
+        <text x="310" y="112" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="rgba(248,113,113,0.5)">-£285.00</text>
+        <text x="385" y="112" font-family="system-ui,sans-serif" font-size="10" fill="#374151">Historical</text>
+        <!-- Row 4 historical -->
+        <rect x="0" y="122" width="460" height="30" fill="rgba(255,255,255,0.015)"/>
+        <text x="12" y="142" font-family="system-ui,sans-serif" font-size="10" fill="rgba(156,163,175,0.5)">1 Apr 2026</text>
+        <rect x="88" y="129" width="30" height="16" rx="8" fill="rgba(52,211,153,0.1)"/>
+        <text x="92" y="141" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="rgba(52,211,153,0.5)">income</text>
+        <text x="148" y="142" font-family="system-ui,sans-serif" font-size="10" fill="rgba(229,231,235,0.4)">Tax rebate</text>
+        <text x="310" y="142" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="rgba(52,211,153,0.5)">+£890.00</text>
+        <text x="385" y="142" font-family="system-ui,sans-serif" font-size="10" fill="#374151">Historical</text>
+        <line x1="0" y1="152" x2="460" y2="152" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <text x="12" y="175" font-family="system-ui,sans-serif" font-size="10" fill="#34d399">Total income: +£2,390.00</text>
+        <text x="180" y="175" font-family="system-ui,sans-serif" font-size="10" fill="#f87171">Total expenses: -£627.00</text>
+        <text x="360" y="175" font-family="system-ui,sans-serif" font-size="10" font-weight="700" fill="#34d399">Net: +£1,763.00</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── 5. Loan Management ── -->
+  <div class="feature">
+    <div class="feature-text">
+      <div class="feature-label">Loan Management</div>
+      <h2>Keep loans out of your blind spot</h2>
+      <p>Add your mortgage, personal loans or car finance and Finaura tracks repayments automatically. Monthly instalments flow straight into your cashflow forecast — so your projected balance always reflects what you actually owe.</p>
+      <ul>
+        <li>Track any loan with a start date, end date and repayment amount</li>
+        <li>Repayments fold automatically into the cashflow forecast</li>
+        <li>Upcoming payments visible in the 60-day timeline</li>
+        <li>View remaining term at a glance</li>
+      </ul>
+    </div>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="mockup-dot" style="background:#ef4444"></div>
+        <div class="mockup-dot" style="background:#f59e0b"></div>
+        <div class="mockup-dot" style="background:#22c55e"></div>
+        <span class="mockup-title">My Loans</span>
+      </div>
+      <svg viewBox="0 0 460 220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Loan 1 -->
+        <rect x="12" y="14" width="436" height="80" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <text x="26" y="36" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#e5e7eb">Mortgage — Halifax</text>
+        <rect x="26" y="44" width="70" height="15" rx="7" fill="rgba(147,197,253,0.12)"/>
+        <text x="32" y="55" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#93c5fd">🏦 Monthly</text>
+        <text x="26" y="76" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Repayment: <tspan font-weight="600" fill="#e5e7eb">£1,050.00/mo</tspan>  ·  Ends: <tspan fill="#9ca3af">Dec 2041</tspan></text>
+        <text x="340" y="36" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Balance</text>
+        <text x="330" y="54" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#e5e7eb">£187,400</text>
+        <!-- Loan 2 -->
+        <rect x="12" y="106" width="436" height="80" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <text x="26" y="128" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#e5e7eb">Car Finance — Toyota</text>
+        <rect x="26" y="136" width="70" height="15" rx="7" fill="rgba(147,197,253,0.12)"/>
+        <text x="32" y="147" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#93c5fd">🏦 Monthly</text>
+        <text x="26" y="168" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Repayment: <tspan font-weight="600" fill="#e5e7eb">£340.00/mo</tspan>  ·  Ends: <tspan fill="#9ca3af">Mar 2028</tspan></text>
+        <text x="340" y="128" font-family="system-ui,sans-serif" font-size="10" fill="#9ca3af">Balance</text>
+        <text x="330" y="146" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#e5e7eb">£7,820</text>
+      </svg>
+    </div>
+  </div>
+
+</div>
+
+<!-- Bottom CTA -->
+<div class="bottom-cta">
+  <h2>Ready to try it for yourself?</h2>
+  <p>Free forever. No subscription. Works as a guest — no account needed to start.</p>
+  <div class="bottom-cta-btns">
+    <a href="index.html" class="btn-primary">Get started — it's free</a>
+    <a href="index.html" class="btn-ghost">Back to home</a>
+  </div>
+</div>
+
+<footer>
+  © 2026 Finaura. All rights reserved. · Built with ♥ ·
+  <a href="legal.html">Terms &amp; Privacy</a>
+</footer>
+
+</body>
+</html>

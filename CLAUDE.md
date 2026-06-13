@@ -2,7 +2,9 @@
 
 This file provides guidance to Claude when working with code in this repository.
 
-> **Standing instruction:** After completing any code change, always consider whether `tests/e2e.spec.js` needs updating. Specifically: if a new data type or Supabase table is added, a new test block is needed. If a form field ID, button selector, or table name changes, the relevant test must be updated to match. If a mutation function is added or renamed, check whether it's covered. Raise this proactively — don't wait to be asked.
+> **Standing instruction — E2E tests:** After completing any code change, always consider whether `tests/e2e.spec.js` needs updating. Specifically: if a new data type or Supabase table is added, a new test block is needed. If a form field ID, button selector, or table name changes, the relevant test must be updated to match. If a mutation function is added or renamed, check whether it's covered. Raise this proactively — don't wait to be asked.
+
+> **Standing instruction — Public-facing pages:** After adding or changing any feature, always assess whether `index.html` (landing page) and `tour.html` need updating. Specifically: if a new feature is added, consider whether it warrants a new feature card on the landing page, a new section in tour.html, or an update to the FAQ. If an existing feature is renamed, changed in scope, or removed, update any copy that references it. If a new export, configuration option, or supported currency is added, check the FAQ answers. Raise this proactively — don't wait to be asked.
 
 ## Project overview
 
@@ -24,6 +26,7 @@ Users can sign in with Google or GitHub (data syncs to Supabase cloud DB) or use
 | `app.js` | All JavaScript — data model, Supabase auth/data layer, navigation, render functions, event handlers, INIT |
 | `favicon.svg` | Browser tab icon — teal rounded square with white F letterform and mint sparkline |
 | `legal.html` | Terms of Service and Privacy Policy (standalone page) |
+| `tour.html` | Feature tour (standalone public page) — SVG UI mockups for each major feature, linked from the landing page nav and hero |
 | `og-image.svg` | 1200×630 Open Graph image for social sharing previews |
 | `sitemap.xml` | XML sitemap submitted to Google Search Console |
 | `robots.txt` | Allows all crawlers, points to sitemap |
@@ -140,6 +143,39 @@ A full-screen `<div id="landing-overlay">` sits at the top of `<body>`, before `
 `checkFirstVisit()` hides the overlay if `mf_launched` is set or financial data already exists. It is only called from INIT when there is **no active Supabase session** — signed-in users bypass it via the async auth init.
 
 `launchApp()` sets `mf_launched = '1'` and hides the overlay (guest path).
+
+### Public-facing pages
+
+Three standalone pages are visible to unauthenticated visitors and are indexed by Google. These must be kept in sync with app features.
+
+#### `index.html` — Landing page overlay (`#landing-overlay`)
+
+Structure (top to bottom):
+
+| Section | Element | Content |
+|---|---|---|
+| Nav | `.lp-nav` | Logo, "See how it works" link → `tour.html`, "Sign in — Free" CTA |
+| Hero | `.lp-hero` | Headline, sub-copy, sign-in auth box, "See features ↓" + "Take a tour →" buttons |
+| How it works | `.lp-how` | 3-step onboarding flow (add recurring → add cards/loans → see cashflow) |
+| Features | `.lp-features` | 6 feature cards: Cashflow Forecasting, Credit Card Tracker, Recurring Transactions, Loan Management, One-off Transactions, Debt Calculators |
+| Trust | `.lp-trust` | Privacy/data model explanation, 4 trust pills |
+| FAQ | `.lp-faq` | 6 Q&As: cost, account requirement, data safety, bank connections, currencies, CSV export |
+| Final CTA | `.lp-final-cta` | Sign-in button + guest link |
+| Footer | `.lp-footer` | Copyright, Tour link, Terms & Privacy link |
+
+**When to update:** add a feature card if a new major feature ships; update FAQ answers if currency support, export formats, or privacy model changes; update the "How it works" steps if the onboarding flow changes significantly.
+
+#### `tour.html` — Feature tour
+
+Standalone dark-themed page at `https://finaura.app/tour.html`. Linked from the landing page nav, hero, and footer. Contains five feature sections in alternating layout (text + SVG UI mockup):
+
+1. **Cashflow Forecasting** — month-by-month projection table mockup
+2. **Recurring Transactions** — table with income/expense badges, months badge
+3. **Credit Card Tracker** — three cards with green/amber/red utilisation bars
+4. **One-off Transactions** — mixed future/historical entries table
+5. **Loan Management** — two loan cards with balances and repayment details
+
+**When to update:** add a new section if a significant new feature ships; update the SVG mockup and bullet points for any feature that changes visually or in scope; update the bottom CTA copy if the pricing/account model changes. SVG mockups are inline in `tour.html` — edit the `<svg viewBox="...">` block inside the relevant `.mockup` div.
 
 ### Sidebar collapse
 
