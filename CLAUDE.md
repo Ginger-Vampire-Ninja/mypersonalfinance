@@ -66,7 +66,7 @@ PostHog EU Cloud init snippet stays in `index.html` `<head>` — **never move it
 |---|---|---|
 | `page_viewed` | `navigate()` | `page` |
 | `transaction_added` | `addOneoff()` | `type`, `category` |
-| `recurring_added` | `addRecurring()` | `type`, `frequency`, `category` |
+| `recurring_added` | `saveRecurring()` (add path only) | `type`, `frequency`, `category` |
 | `card_saved` | `saveCard()` | `is_edit`, `min_type` |
 | `loan_saved` | `saveLoan()` | `is_edit`, `frequency` |
 | `cashflow_viewed` | `renderCashflow()` | `months` |
@@ -101,7 +101,7 @@ let currentUser = null;
 |---|---|
 | `income` | `toDbIncome` / `fromDbIncome` |
 | `expenses` | `toDbIncome` / `fromDbIncome` (same shape) |
-| `recurring` | `toDbRecurring` / `fromDbRecurring` (`startDate` ↔ `start_date`, `endDate` ↔ `end_date`) |
+| `recurring` | `toDbRecurring` / `fromDbRecurring` (`startDate` ↔ `start_date`, `endDate` ↔ `end_date`, `activeMonths` ↔ `active_months`) — **requires `active_months JSONB DEFAULT NULL` column** |
 | `credit_cards` | `toDbCard` / `fromDbCard` (`minType` ↔ `min_type`, `creditLimit` ↔ `credit_limit`) — **requires `credit_limit NUMERIC DEFAULT NULL` column** (run migration before deploying) |
 | `promo_deals` | `toDbDeal` / `fromDbDeal` (`cardId` ↔ `card_id`) — renamed from `interest_free_deals` to avoid ad blocker URL blocking |
 | `cc_transactions` | `toDbCCT` / `fromDbCCT` (`cardId` ↔ `card_id`) |
@@ -186,7 +186,7 @@ All state is module-level `let` variables, loaded from `localStorage` on startup
 |---|---|---|
 | `incomeData` | `mf_income` | `[{id, date, category, amount, description}]` |
 | `expenseData` | `mf_expenses` | same as income |
-| `recurringData` | `mf_recurring` | `[{id, type, name, category, amount, frequency, startDate, endDate}]` |
+| `recurringData` | `mf_recurring` | `[{id, type, name, category, amount, frequency, startDate, endDate, activeMonths}]` — `activeMonths` is `number[] \| null` (0=Jan…11=Dec); null means all months |
 | `creditCards` | `mf_cards` | `[{id, name, balance, apr, minType, minPct, minFloor, minFixed, creditLimit}]` — `creditLimit` is optional (null if not set) |
 | `interestFreeDeals` | `mf_deals` | `[{id, cardId, amount, startDate, endDate, note}]` |
 | `ccTransactions` | `mf_cc_transactions` | `[{id, cardId, date, amount, category, description, type}]` where `type` is `'charge'` or `'payment'` |

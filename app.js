@@ -46,8 +46,8 @@ let currentUser = null;
 // ── Field mapping (camelCase JS ↔ snake_case DB) ──
 function toDbIncome(r)      { return { id: r.id, date: r.date, category: r.category, amount: r.amount, description: r.description || null }; }
 function fromDbIncome(r)    { return { id: r.id, date: r.date, category: r.category, amount: parseFloat(r.amount), description: r.description }; }
-function toDbRecurring(r)   { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: r.amount, frequency: r.frequency, start_date: r.startDate, end_date: r.endDate || null }; }
-function fromDbRecurring(r) { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: parseFloat(r.amount), frequency: r.frequency, startDate: r.start_date, endDate: r.end_date }; }
+function toDbRecurring(r)   { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: r.amount, frequency: r.frequency, start_date: r.startDate, end_date: r.endDate || null, active_months: r.activeMonths || null }; }
+function fromDbRecurring(r) { return { id: r.id, type: r.type, name: r.name, category: r.category, amount: parseFloat(r.amount), frequency: r.frequency, startDate: r.start_date, endDate: r.end_date, activeMonths: r.active_months || null }; }
 function toDbCard(c)        { return { id: c.id, name: c.name, balance: c.balance, apr: c.apr, min_type: c.minType, min_pct: c.minPct || null, min_floor: c.minFloor || null, min_fixed: c.minFixed || null, credit_limit: c.creditLimit || null }; }
 function fromDbCard(c)      { return { id: c.id, name: c.name, balance: parseFloat(c.balance), apr: parseFloat(c.apr), minType: c.min_type, minPct: c.min_pct ? parseFloat(c.min_pct) : null, minFloor: c.min_floor ? parseFloat(c.min_floor) : null, minFixed: c.min_fixed ? parseFloat(c.min_fixed) : null, creditLimit: c.credit_limit ? parseFloat(c.credit_limit) : null }; }
 function toDbDeal(d)        { return { id: d.id, card_id: d.cardId, amount: d.amount, start_date: d.startDate, end_date: d.endDate, note: d.note || null }; }
@@ -443,10 +443,14 @@ function getOccurrenceDates(item, fromDate, toDate) {
   while (cur < fromDate) advance();
   const effEnd = endCap ? new Date(Math.min(endCap, toDate)) : toDate;
   while (cur <= effEnd) { dates.push(new Date(cur)); advance(); if (dates.length > 1000) break; }
+  if (item.activeMonths && item.activeMonths.length > 0) {
+    return dates.filter(d => item.activeMonths.includes(d.getMonth()));
+  }
   return dates;
 }
 
 function getAmountForMonth(item, year, month) {
+  if (item.activeMonths && item.activeMonths.length > 0 && !item.activeMonths.includes(month)) return 0;
   const ms = new Date(year, month, 1);
   const me = new Date(year, month + 1, 0, 23, 59, 59);
   const is = new Date(item.startDate + 'T00:00:00');
@@ -774,28 +778,116 @@ function renderOneoffList() {
 // ══════════════════════════════════════════════════
 //  RECURRING
 // ══════════════════════════════════════════════════
-let currentRecType = 'income';
+const REC_MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let currentRecType   = 'income';
+let editingRecurringId = null;
+
 function setRecType(type) {
   currentRecType = type;
   document.getElementById('rec-toggle-income').classList.toggle('active', type==='income');
   document.getElementById('rec-toggle-expense').classList.toggle('active', type==='expense');
 }
-function addRecurring() {
-  const name=document.getElementById('rec-name').value.trim(), cat=document.getElementById('rec-category').value;
-  const amt=parseFloat(document.getElementById('rec-amount').value), freq=document.getElementById('rec-frequency').value;
-  const start=document.getElementById('rec-start').value, end=document.getElementById('rec-end').value;
-  if (!name) { toast('⚠️ Enter a name'); return; }
-  if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
-  if (!start) { toast('⚠️ Pick a start date'); return; }
-  const rec = { id:Date.now(), type:currentRecType, name, category:cat, amount:amt, frequency:freq, startDate:start, endDate:end||null };
-  recurringData.push(rec); dbUpsert('recurring', rec, toDbRecurring);
-  saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('✅ Recurring transaction added!');
-  if (window.posthog) posthog.capture('recurring_added', { type: currentRecType, frequency: freq, category: cat });
-  document.getElementById('rec-name').value=''; document.getElementById('rec-amount').value=''; document.getElementById('rec-end').value='';
+
+// ── Month picker helpers ──
+function onRecFrequencyChange() {
+  // Active months only makes sense for monthly frequency — "occurs monthly but skips certain months".
+  // All other frequencies (weekly, fortnightly, quarterly, annually) don't need this concept.
+  const isMonthly = document.getElementById('rec-frequency').value === 'monthly';
+  document.getElementById('rec-months-section').style.display = isMonthly ? '' : 'none';
+  if (!isMonthly) {
+    // reset the picker so stale month selections don't silently persist
+    document.getElementById('rec-months-toggle').checked = false;
+    document.getElementById('rec-months-picker').style.display = 'none';
+  }
 }
-function deleteRecurring(id) { recurringData=recurringData.filter(r=>r.id!==id); dbDelete('recurring', id); saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted'); }
+function toggleRecMonths() {
+  const on = document.getElementById('rec-months-toggle').checked;
+  document.getElementById('rec-months-picker').style.display = on ? '' : 'none';
+}
+function toggleMonthBtn(el) {
+  el.classList.toggle('active');
+}
+function _getActiveMonths() {
+  if (!document.getElementById('rec-months-toggle').checked) return null;
+  const active = [...document.querySelectorAll('#rec-months-picker .month-btn.active')].map(b => parseInt(b.dataset.m));
+  if (active.length === 0 || active.length === 12) return null; // no restriction
+  return active.sort((a,b) => a-b);
+}
+function _setActiveMonths(months) {
+  const hasMonths = months && months.length > 0 && months.length < 12;
+  document.getElementById('rec-months-toggle').checked = hasMonths;
+  document.getElementById('rec-months-picker').style.display = hasMonths ? '' : 'none';
+  document.querySelectorAll('#rec-months-picker .month-btn').forEach(b => {
+    b.classList.toggle('active', !hasMonths || months.includes(parseInt(b.dataset.m)));
+  });
+}
+
+function saveRecurring() {
+  const name  = document.getElementById('rec-name').value.trim();
+  const cat   = document.getElementById('rec-category').value;
+  const amt   = parseFloat(document.getElementById('rec-amount').value);
+  const freq  = document.getElementById('rec-frequency').value;
+  const start = document.getElementById('rec-start').value;
+  const end   = document.getElementById('rec-end').value;
+  const activeMonths = _getActiveMonths();
+  if (!name)              { toast('⚠️ Enter a name'); return; }
+  if (isNaN(amt)||amt<=0) { toast('⚠️ Enter a valid amount'); return; }
+  if (!start)             { toast('⚠️ Pick a start date'); return; }
+  const isEdit = !!editingRecurringId;
+  const id = editingRecurringId || Date.now();
+  const rec = { id, type: currentRecType, name, category: cat, amount: amt, frequency: freq, startDate: start, endDate: end||null, activeMonths };
+  if (isEdit) { const i = recurringData.findIndex(r => r.id === id); if (i > -1) recurringData[i] = rec; }
+  else recurringData.push(rec);
+  dbUpsert('recurring', rec, toDbRecurring);
+  saveData(); renderRecurringTable(); renderUpcomingTimeline();
+  toast(isEdit ? '✅ Recurring transaction updated!' : '✅ Recurring transaction added!');
+  if (!isEdit && window.posthog) posthog.capture('recurring_added', { type: currentRecType, frequency: freq, category: cat });
+  clearRecurringForm();
+}
+
+function editRecurring(id) {
+  const r = recurringData.find(r => r.id === id); if (!r) return;
+  editingRecurringId = id;
+  setRecType(r.type);
+  document.getElementById('rec-name').value      = r.name;
+  document.getElementById('rec-category').value  = r.category;
+  document.getElementById('rec-amount').value    = r.amount;
+  document.getElementById('rec-frequency').value = r.frequency;
+  document.getElementById('rec-start').value     = r.startDate;
+  document.getElementById('rec-end').value       = r.endDate || '';
+  onRecFrequencyChange();
+  _setActiveMonths(r.activeMonths);
+  document.getElementById('rec-form-title').textContent = 'Edit Recurring Transaction';
+  document.getElementById('rec-save-btn').textContent   = 'Save Changes';
+  document.getElementById('rec-cancel-btn').style.display = '';
+  document.getElementById('rec-name').focus();
+  document.querySelector('#page-recurring .panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast('✏️ Editing — update fields and save');
+}
+
+function cancelRecurringEdit() { clearRecurringForm(); }
+
+function clearRecurringForm() {
+  editingRecurringId = null;
+  ['rec-name','rec-amount','rec-end'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('rec-frequency').value = 'monthly';
+  document.getElementById('rec-category').value  = 'Salary';
+  setRecType('income');
+  onRecFrequencyChange();
+  _setActiveMonths(null);
+  document.getElementById('rec-form-title').textContent   = 'Add Recurring Transaction';
+  document.getElementById('rec-save-btn').textContent     = '+ Add Recurring';
+  document.getElementById('rec-cancel-btn').style.display = 'none';
+}
+
+function deleteRecurring(id) {
+  recurringData = recurringData.filter(r => r.id !== id);
+  dbDelete('recurring', id);
+  saveData(); renderRecurringTable(); renderUpcomingTimeline(); toast('🗑 Deleted');
+}
+
 function renderRecurringTable() {
-  const tbody=document.getElementById('recurring-table-body');
+  const tbody = document.getElementById('recurring-table-body');
   // Build loan read-only rows
   const loanRows = loansData.map(loan => `<tr style="opacity:0.8">
     <td><span class="badge badge-expense" style="background:#1e3a5f;color:#93c5fd">🏦 Loan</span></td>
@@ -807,15 +899,23 @@ function renderRecurringTable() {
     <td class="text-muted-sm">${loan.endDate?formatDate(loan.endDate):'—'}</td>
     <td class="text-muted-sm" style="font-style:italic">Managed in Loans</td></tr>`);
   if (!recurringData.length && !loanRows.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-state">No recurring transactions yet</td></tr>'; return; }
-  tbody.innerHTML=recurringData.map(r=>`<tr>
-    <td><span class="badge badge-${r.type}">${r.type}</span></td>
-    <td style="font-weight:600">${r.name}</td><td>${r.category}</td>
-    <td style="font-weight:600">${fmt(r.amount)}</td>
-    <td><span class="badge badge-freq">${FREQ_LABELS[r.frequency]}</span></td>
-    <td class="text-muted">${fmt(monthlyEquiv(r))}/mo</td>
-    <td class="text-muted-sm">${formatDate(r.startDate)}</td>
-    <td class="text-muted-sm">${r.endDate?formatDate(r.endDate):'—'}</td>
-    <td><button class="btn-sm-danger" onclick="deleteRecurring(${r.id})">Delete</button></td></tr>`).join('') + loanRows.join('');
+  tbody.innerHTML = recurringData.map(r => {
+    const mBadge = r.activeMonths && r.activeMonths.length > 0 && r.activeMonths.length < 12
+      ? `<div class="rec-months-badge">${r.activeMonths.length <= 5 ? r.activeMonths.map(m=>REC_MONTH_NAMES[m]).join(', ') : r.activeMonths.length+'/12 months'}</div>` : '';
+    return `<tr>
+      <td><span class="badge badge-${r.type}">${r.type}</span></td>
+      <td style="font-weight:600">${r.name}${mBadge}</td>
+      <td>${r.category}</td>
+      <td style="font-weight:600">${fmt(r.amount)}</td>
+      <td><span class="badge badge-freq">${FREQ_LABELS[r.frequency]}</span></td>
+      <td class="text-muted">${fmt(monthlyEquiv(r))}/mo</td>
+      <td class="text-muted-sm">${formatDate(r.startDate)}</td>
+      <td class="text-muted-sm">${r.endDate?formatDate(r.endDate):'—'}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-sm-ghost" onclick="editRecurring(${r.id})">Edit</button>
+        <button class="btn-sm-danger" onclick="deleteRecurring(${r.id})">Delete</button>
+      </td></tr>`;
+  }).join('') + loanRows.join('');
 }
 function renderUpcomingTimeline() {
   const today=new Date(); today.setHours(0,0,0,0);
