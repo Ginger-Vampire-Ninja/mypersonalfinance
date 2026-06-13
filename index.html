@@ -73,7 +73,10 @@
         <text x="40" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5"><tspan fill="white">Fin</tspan><tspan fill="#2DD4BF">aura</tspan></text>
       </svg>
     </div>
-    <button class="lp-nav-cta" onclick="signInWithGoogle()">Sign in — Free</button>
+    <div style="display:flex;align-items:center;gap:16px">
+      <a href="tour.html" class="lp-nav-tour">See how it works</a>
+      <button class="lp-nav-cta" onclick="signInWithGoogle()">Sign in — Free</button>
+    </div>
   </nav>
 
   <div class="lp-hero">
@@ -115,7 +118,34 @@
       <button class="btn-continue-guest" onclick="launchApp()">Continue without account</button>
       <p class="lp-auth-note">Sign in to sync across devices and protect against data loss</p>
     </div>
-    <button class="lp-btn-secondary" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">See Features ↓</button>
+    <div class="lp-hero-links">
+      <button class="lp-btn-secondary" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">See features ↓</button>
+      <a href="tour.html" class="lp-btn-tour">Take a tour →</a>
+    </div>
+  </div>
+
+  <div class="lp-how" id="lp-how">
+    <h2>Up and running in minutes</h2>
+    <p class="lp-subtitle">No install. No spreadsheet setup. Just open and go.</p>
+    <div class="lp-steps">
+      <div class="lp-step">
+        <div class="lp-step-num">1</div>
+        <h3>Add your regular money</h3>
+        <p>Enter your salary, rent, subscriptions — anything that repeats. Finaura works out the monthly impact automatically.</p>
+      </div>
+      <div class="lp-step-arrow">→</div>
+      <div class="lp-step">
+        <div class="lp-step-num">2</div>
+        <h3>Add your cards &amp; loans</h3>
+        <p>Tell Finaura about your credit cards and any outstanding loans. Repayments and interest fold straight into your forecast.</p>
+      </div>
+      <div class="lp-step-arrow">→</div>
+      <div class="lp-step">
+        <div class="lp-step-num">3</div>
+        <h3>See your future cashflow</h3>
+        <p>A clear month-by-month table shows your projected balance up to two years ahead — so you can spot tight months before they happen.</p>
+      </div>
+    </div>
   </div>
 
   <div class="lp-features" id="lp-features">
@@ -166,6 +196,36 @@
     </div>
   </div>
 
+  <div class="lp-faq" id="lp-faq">
+    <h2>Frequently asked questions</h2>
+    <div class="lp-faq-grid">
+      <div class="lp-faq-item">
+        <h3>Is Finaura really free?</h3>
+        <p>Yes, completely. There's no subscription, no trial period, and no premium tier. All features are available to everyone.</p>
+      </div>
+      <div class="lp-faq-item">
+        <h3>Do I need an account?</h3>
+        <p>No — you can use Finaura as a guest straight away. Your data stays in your browser. Create a free account if you want to sync across devices or protect against losing your data if you clear your browser.</p>
+      </div>
+      <div class="lp-faq-item">
+        <h3>Is my financial data safe?</h3>
+        <p>Guest mode: your data never leaves your device — it's stored only in your browser's local storage and we have no access to it. Signed-in mode: your data is stored securely in the cloud, protected by the same infrastructure used by thousands of applications worldwide.</p>
+      </div>
+      <div class="lp-faq-item">
+        <h3>Does it connect to my bank?</h3>
+        <p>Not currently — you enter transactions manually. This keeps things simple, privacy-friendly, and means there are no bank connection fees or third-party access to your accounts.</p>
+      </div>
+      <div class="lp-faq-item">
+        <h3>What currencies does it support?</h3>
+        <p>Finaura supports GBP (£), USD ($), EUR (€), and several other major currencies. You can switch at any time in the app settings.</p>
+      </div>
+      <div class="lp-faq-item">
+        <h3>Can I export my data?</h3>
+        <p>Yes — each transaction table has an Export button that downloads a CSV file you can open in Excel, Google Sheets, or any spreadsheet app.</p>
+      </div>
+    </div>
+  </div>
+
   <div class="lp-final-cta">
     <h2>Ready to take control?</h2>
     <p>Free forever. No subscription. Start in seconds.</p>
@@ -177,7 +237,8 @@
   </div>
 
   <div class="lp-footer">
-    © 2025 Finaura. All rights reserved. · Built with ♥ ·
+    © 2026 Finaura. All rights reserved. · Built with ♥ ·
+    <a href="tour.html" style="color:#6b7280;text-decoration:underline;">Tour</a> ·
     <a href="legal.html" style="color:#6b7280;text-decoration:underline;">Terms &amp; Privacy</a>
   </div>
 
