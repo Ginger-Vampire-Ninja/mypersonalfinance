@@ -8,7 +8,20 @@ This file provides guidance to Claude when working with code in this repository.
 
 ## Project overview
 
-Personal finance web app called **Finaura**, live at **https://finaura.app**. The app is split across three files — `index.html`, `styles.css`, and `app.js` (~1940 lines). No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
+Personal finance web app called **Finaura**, live at **https://finaura.app**. No framework, no build step. Dependencies: PostHog (CDN), Supabase JS v2 (self-hosted as `supabase.min.js`), optional Google AdSense. Deployed to GitHub Pages with a custom domain.
+
+The JavaScript is split into five ES modules plus a thin entry point:
+
+```
+js/helpers.js  — constants, formatters, pure utils (no deps)
+js/engine.js   — pure cashflow calculation functions (no deps)
+js/data.js     — Supabase client, data stores, field mappers, DB helpers
+js/auth.js     — OAuth, email auth, account menu UI, migration banner, migrateFromLocalStorage
+js/render.js   — all 10 render* functions, shared UI state variables
+app.js         — CRUD/event handlers, navigation, sidebar, bootstrap IIFE, window exports
+```
+
+Dependency order (acyclic): `helpers.js` / `engine.js` → `data.js` → `auth.js` → `render.js` → `app.js`.
 
 Users can sign in with Google or GitHub (data syncs to Supabase cloud DB) or use the app as a guest (data stays in `localStorage` only). Both modes work simultaneously — `saveData()` always writes to `localStorage`; `dbUpsert`/`dbDelete` additionally sync to Supabase when `currentUser` is set.
 
@@ -23,7 +36,12 @@ Users can sign in with Google or GitHub (data syncs to Supabase cloud DB) or use
 | `index.html` | HTML shell — `<head>` with PostHog init, Supabase self-hosted script, AdSense script, favicon; all `<section>` page markup; links to `styles.css` and `app.js` |
 | `supabase.min.js` | Self-hosted Supabase JS v2 UMD bundle — served from same origin to bypass browser tracking prevention (Edge blocks CDN-loaded Supabase from accessing storage) |
 | `styles.css` | All app styles — layout, sidebar, cards, tables, forms, cashflow colours, landing overlay, auth box, account menu |
-| `app.js` | All JavaScript — data model, Supabase auth/data layer, navigation, render functions, event handlers, INIT |
+| `app.js` | Entry point (~983 lines) — imports all modules, CRUD/event handlers, navigation, sidebar helpers, bootstrap IIFE, `window` exports |
+| `js/helpers.js` | Constants (`CURRENCIES`, `INCOME_CATS`, etc.), `currentCurrency`/`setCurrentCurrency`, all pure formatters (`fmt`, `fmtS`, `esc`, `toast`, `formatDate`, etc.), sparkline/trend helpers, `exportCSV` |
+| `js/engine.js` | Pure cashflow functions — `getOccurrenceDates`, `getAmountForMonth`, `getInterestFreeAmount`, `generateProjection` (no DOM, no data deps) |
+| `js/data.js` | Supabase client, all 9 data stores + setters, `saveData`, camelCase↔snake_case field mappers, `dbUpsert`/`dbDelete`, `loadUserData` |
+| `js/auth.js` | OAuth (`signInWithGoogle`, `signInWithGitHub`), email auth, `updateUserUI`, `updateCurrencyUI`, account menu, migration banner, `migrateFromLocalStorage` |
+| `js/render.js` | All 10 `render*` functions; shared UI state (`currentOneoffFilter`, `currentCCTFilter`, `editingCCTId`, `editingLoanId`) with setters |
 | `favicon.svg` | Browser tab icon — teal rounded square with white F letterform and mint sparkline |
 | `legal.html` | Terms of Service and Privacy Policy (standalone page) |
 | `tour.html` | Feature tour (standalone public page) — SVG UI mockups for each major feature, linked from the landing page nav and hero |
@@ -33,10 +51,12 @@ Users can sign in with Google or GitHub (data syncs to Supabase cloud DB) or use
 | `ads.txt` | Google AdSense verification file |
 | `CNAME` | Custom domain config (`finaura.app`) for GitHub Pages |
 | `CLAUDE.md` | This file |
-| `package.json` | Dev dependencies for E2E tests (Playwright, Supabase JS, ws) |
+| `package.json` | Dev dependencies for E2E tests (Playwright, Supabase JS, ws); `"type": "module"` for Node test runner |
 | `playwright.config.js` | Playwright configuration — targets `https://finaura.app`, chromium only |
+| `tests/engine.test.js` | Unit tests for `js/engine.js` — 32 tests, run via `node --test` |
 | `tests/e2e.spec.js` | E2E DB sync tests — signs in as test user, adds data via UI, verifies rows in Supabase |
-| `.github/workflows/e2e.yml` | GitHub Actions workflow — runs E2E tests after every Pages deploy or manual trigger |
+| `.github/workflows/unit.yml` | GitHub Actions — runs unit tests on every push/PR |
+| `.github/workflows/e2e.yml` | GitHub Actions — runs E2E tests after every Pages deploy or manual trigger |
 | `.gitignore` | Excludes `node_modules/`, `playwright-report/`, `test-results/` |
 
 ## Git workflow
@@ -51,15 +71,62 @@ git branch
 git status
 ```
 
-**Important:** The bash sandbox mount of the repo is often stale — it may reflect older versions of `index.html`, `styles.css`, and `app.js`. Always use the `Read` tool (not bash `cat` or `wc -l`) to read the real current file content and get accurate line numbers.
+**Important:** The bash sandbox mount of the repo is often stale — it may reflect older versions of files. Always use the `Read` tool (not bash `cat` or `wc -l`) to read the real current file content and get accurate line numbers. This applies to all files: `app.js`, the `js/` modules, `index.html`, `styles.css`, etc.
 
 ## Architecture
 
-The app is split into three files served by GitHub Pages:
+### File structure
 
-- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, `<script src="supabase.min.js">` (self-hosted), Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (with `.lp-auth-box` Google sign-in UI), top-right `#account-menu` div, sidebar, migration banner (`#migration-banner`), and all `<section class="page">` elements. Ends with `<script src="app.js"></script>` just before `</body>`. **PostHog, Supabase, and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
+- **`index.html`** — `<head>` contains: meta/SEO/Open Graph tags, PostHog init snippet, `<script src="supabase.min.js">` (self-hosted), Google AdSense script, `<link rel="icon" href="favicon.svg">`, and `<link rel="stylesheet" href="styles.css">`. `<body>` has the landing overlay (with `.lp-auth-box` Google sign-in UI), top-right `#account-menu` div, sidebar, migration banner (`#migration-banner`), and all `<section class="page">` elements. Ends with `<script type="module" src="app.js"></script>` just before `</body>`. **PostHog, Supabase, and AdSense scripts must stay in `index.html` `<head>` — never move them to `app.js`.**
 - **`styles.css`** — all styles. Teal sidebar (`#0F766E`), mint accent `#2DD4BF`, auth box (`lp-auth-box`), account menu (`.account-menu*`), migration banner, dark mode block (`html[data-theme="dark"] ...`), semantic colour utility classes.
-- **`app.js`** (~1960 lines) — all JS logic. Sections are marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
+- **`app.js`** (~983 lines) — thin entry point. Imports all modules, contains CRUD/event handlers, nav/sidebar helpers, bootstrap IIFE, and `Object.assign(window, {...})` exports. Sections marked with `//  SECTION NAME` (double-space after `//`) for easy grepping.
+
+### JS module structure
+
+```
+js/helpers.js   (~200 lines)
+  Constants: CURRENCIES, INCOME_CATS, EXPENSE_CATS, REC_MONTH_NAMES, CC_TXN_CATS, FREQ_LABELS
+  Currency: currentCurrency (let), setCurrentCurrency
+  Formatters: fmt, fmtS, genId, esc, todayStr, toast, formatDate, formatMonthYear,
+              isThisMonthOrFuture, monthlyEquiv, exportCSV
+  Dashboard utils: getMonthTotals, buildSparkline, trendBadge
+
+js/engine.js    (~320 lines)
+  getOccurrenceDates(item, from, to) — all dates a recurring item fires in a range
+  getAmountForMonth(item, yr, mo)    — amount for a specific month (respects activeMonths)
+  getInterestFreeAmount(deals, cardId, yr, mo) — active 0% deal balance for a card/month
+  generateProjection(numMonths, data) — full cashflow projection, returns rows[]
+
+js/data.js      (~133 lines)
+  Supabase client (db), currentUser / setCurrentUser
+  9 data stores (let) + 9 setters: incomeData, expenseData, recurringData, creditCards,
+    interestFreeDeals, ccTransactions, loansData, accountsData, savingsTransfers
+  saveData()          — writes all stores to localStorage
+  18 field mappers    — toDb*/fromDb* for every table
+  dbUpsert/dbDelete   — generic Supabase helpers (no-op when guest)
+  loadUserData()      — bulk fetch all data for signed-in user
+
+js/auth.js      (~221 lines)
+  signInWithGoogle, signInWithGitHub, signOut
+  setAuthMode, submitEmailAuth
+  updateCurrencyUI, updateUserUI, toggleAccountMenu
+  showMigrationBanner, dismissMigration
+  launchApp, showSignInOverlay, checkFirstVisit
+  migrateFromLocalStorage   — localStorage → Supabase one-time import
+
+js/render.js    (~687 lines)
+  Shared UI state (exported let + setter):
+    currentOneoffFilter / setCurrentOneoffFilter
+    currentCCTFilter / setCurrentCCTFilter
+    editingCCTId / setEditingCCTId
+    editingLoanId / setEditingLoanId
+  Render functions:
+    renderDashboard, renderOneoffList, renderRecurringTable, renderUpcomingTimeline
+    renderCashflow, renderCardList, renderDealsPage
+    renderLoansPage, renderCCTransactions, renderAccountsPage
+```
+
+**Important — mutable exports:** Data stores and UI state are exported as `let` with companion setters. Importers must use the setter (e.g. `setIncomeData(v)`) rather than reassigning directly, because ES module live bindings are read-only from the importer's side.
 
 ### PostHog analytics
 
@@ -128,7 +195,7 @@ When signed in, a fixed `#account-menu` div appears at top-right of the page (`.
 - Preferences (Soon placeholder)
 - Sign out (danger style)
 
-`updateUserUI()` in `app.js` drives all of this. When signed out, the menu is hidden.
+`updateUserUI()` in `js/auth.js` drives all of this. When signed out, the menu is hidden.
 
 `toggleAccountMenu()` handles open/close, and `_closeAccountMenu()` is registered as a one-time `document` click listener to close on outside click.
 
@@ -216,7 +283,7 @@ Adding a new page requires: (1) sidebar nav item in `index.html`, (2) `<section 
 
 ### Data model
 
-All state is module-level `let` variables, loaded from `localStorage` on startup (or replaced by `loadUserData()` if signed in). `saveData()` writes all seven arrays to `localStorage` after every mutation.
+All state lives in `js/data.js` as exported `let` variables, loaded from `localStorage` on startup (or replaced by `loadUserData()` if signed in). `saveData()` writes all nine arrays to `localStorage` after every mutation. Importers must use the exported setter functions to update these variables — never reassign directly.
 
 | Variable | `localStorage` key | Shape |
 |---|---|---|
@@ -274,7 +341,7 @@ All state is module-level `let` variables, loaded from `localStorage` on startup
 
 Each KPI card has `.card-kpi-row` (value + sparkline) and `.card-kpi-footer` (count + trend badge).
 
-### Cashflow projection engine (`generateProjection`, ~line 318 in `app.js`)
+### Cashflow projection engine (`generateProjection` in `js/engine.js`)
 
 Rolls card balances forward month by month. Order per month is critical:
 
@@ -324,33 +391,20 @@ Sidebar teal (`#0F766E`), mint accent `#2DD4BF`. Key classes:
 - `.acc-rate-badge` — teal pill showing interest rate on savings accounts
 - Semantic colour utility classes — see **Dark mode** section. Always use instead of inline `style="color:#..."`.
 
-### JS section locations in `app.js` (approximate line numbers)
+### Finding code across modules
 
-| Section | ~Line |
+Use `grep -n "^//  "` on any file to list its sections (double-space after `//`). Key locations:
+
+| What you're looking for | File |
 |---|---|
-| DATA + saveData | 2 |
-| SUPABASE (client, field mapping, dbUpsert/dbDelete, loadUserData, auth, updateUserUI, migration) | 33 |
-| NAVIGATION | 166 |
-| HELPERS (fmt, fmtS, genId, esc, toast, dates, getMonthTotals, buildSparkline, trendBadge) | 199 |
-| DEALS helper (getInterestFreeAmount) | 266 |
-| RECURRING date generation | 283 |
-| CASHFLOW ENGINE (generateProjection) | 318 |
-| DASHBOARD | 437 |
-| ONE-OFF TRANSACTIONS | 499 |
-| RECURRING | 589 |
-| CASHFLOW RENDER | 661 |
-| CREDIT CARDS | 731 |
-| 0% DEALS | 831 |
-| LOANS | 983 |
-| CALCULATORS | 1116 |
-| CARD TRANSACTIONS | 1177 |
-| ACCOUNTS | 1589 |
-| COLLAPSIBLE NAV | 1343 |
-| DARK MODE | 1389 |
-| LANDING PAGE (launchApp, checkFirstVisit) | 1413 |
-| INIT | 1898 |
-
-Use `grep -n "^//  "` on `app.js` to find the current line of any section quickly (double-space after `//`).
+| Constants, formatters, `toast`, `fmt`, `exportCSV` | `js/helpers.js` |
+| `generateProjection`, `getOccurrenceDates` | `js/engine.js` |
+| Data stores, `saveData`, `loadUserData`, `dbUpsert`, field mappers | `js/data.js` |
+| Sign-in/out, `updateUserUI`, migration banner, `migrateFromLocalStorage` | `js/auth.js` |
+| Any `render*` function, `editingCCTId`, `currentCCTFilter` | `js/render.js` |
+| CRUD functions (`saveCard`, `saveLoan`, `addOneoff`, etc.) | `app.js` |
+| Navigation (`navigate`), sidebar, dark mode, INIT bootstrap | `app.js` |
+| `window` exports (all onclick-callable functions) | `app.js` — bottom `Object.assign(window, {...})` block |
 
 ## E2E regression tests
 
