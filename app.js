@@ -1,3 +1,12 @@
+import {
+  CURRENCIES, INCOME_CATS, EXPENSE_CATS, REC_MONTH_NAMES, CC_TXN_CATS,
+  FREQ_LABELS, currentCurrency, setCurrentCurrency,
+  fmt, fmtS, genId, esc,
+  todayStr, toast, formatDate, formatMonthYear, isThisMonthOrFuture,
+  monthlyEquiv, exportCSV,
+  getMonthTotals, buildSparkline, trendBadge,
+} from './js/helpers.js';
+
 // ══════════════════════════════════════════════════
 //  DATA
 // ══════════════════════════════════════════════════
@@ -298,34 +307,14 @@ function navigate(page) {
 }
 
 // ══════════════════════════════════════════════════
-//  HELPERS
+//  HELPERS — currency UI + page-level export fns
+//  (pure utils live in ./js/helpers.js)
 // ══════════════════════════════════════════════════
-const CURRENCIES = {
-  GBP: { symbol: '£', label: '£ GBP', flag: '🇬🇧' },
-  USD: { symbol: '$', label: '$ USD', flag: '🇺🇸' },
-  EUR: { symbol: '€', label: '€ EUR', flag: '🇪🇺' },
-};
-let currentCurrency = localStorage.getItem('mf_currency') || 'GBP';
-
-function fmt(n)  { return CURRENCIES[currentCurrency].symbol + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-function fmtS(n) { return (n < 0 ? '-' : '+') + fmt(n); }
-
-// Cryptographically random integer ID — fits in JS safe integer and PostgreSQL int8
-function genId() {
-  const arr = new Uint32Array(2);
-  crypto.getRandomValues(arr);
-  return ((arr[0] & 0x1FFFFF) * 0x100000000) + arr[1];
-}
-
-// HTML-escape user-controlled strings before inserting via innerHTML
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
 
 function _applyCurrencyFromUser(user) {
   const saved = user?.user_metadata?.currency;
   if (saved && CURRENCIES[saved] && saved !== currentCurrency) {
-    currentCurrency = saved;
+    setCurrentCurrency(saved);
     localStorage.setItem('mf_currency', saved);
     updateCurrencyUI();
   }
@@ -333,7 +322,7 @@ function _applyCurrencyFromUser(user) {
 
 function setCurrency(code) {
   if (!CURRENCIES[code]) return;
-  currentCurrency = code;
+  setCurrentCurrency(code);
   localStorage.setItem('mf_currency', code);
   updateCurrencyUI();
   // Persist to Supabase user metadata so it syncs across devices
@@ -350,31 +339,6 @@ function updateCurrencyUI() {
   document.querySelectorAll('.currency-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.code === currentCurrency);
   });
-}
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-function formatDate(ds) {
-  return new Date(ds + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-function formatMonthYear(y, m) {
-  return new Date(y, m, 1).toLocaleString('en-GB', { month: 'short', year: 'numeric' });
-}
-
-// ── CSV export utility ────────────────────────────────────────────────────────
-function exportCSV(filename, headers, rowsData) {
-  const esc = v => { const s = String(v ?? ''); return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s; };
-  const lines = [headers.map(esc).join(','), ...rowsData.map(r => r.map(esc).join(','))];
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 function exportRecurring() {
   const rows = recurringData.map(r => [
@@ -412,57 +376,9 @@ function exportCCTransactions() {
    });
   exportCSV('cc-transactions.csv', ['Date','Type','Card','Category','Description','Amount'], rows);
 }
-function isThisMonthOrFuture(ds) {
-  const now = new Date(); const d = new Date(ds + 'T00:00:00');
-  return d.getFullYear() > now.getFullYear() || (d.getFullYear() === now.getFullYear() && d.getMonth() >= now.getMonth());
-}
 function setDefaultDates() {
   const t = todayStr();
   ['oneoff-date','rec-start','deal-start','cct-date','loan-start','acc-transfer-start'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
-}
-
-const FREQ_MONTHLY = { weekly:52/12, fortnightly:26/12, monthly:1, quarterly:4/12, annually:1/12, 'one-off':0 };
-const FREQ_LABELS  = { weekly:'Weekly', fortnightly:'Fortnightly', monthly:'Monthly', quarterly:'Quarterly', annually:'Annually', 'one-off':'One-off' };
-function monthlyEquiv(item) { return item.amount * FREQ_MONTHLY[item.frequency]; }
-
-function getMonthTotals(data, nMonths) {
-  const now = new Date();
-  const months = [];
-  for (let i = nMonths - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    months.push({ key, total: 0 });
-  }
-  data.forEach(item => {
-    const m = months.find(mo => mo.key === item.date.substring(0,7));
-    if (m) m.total += item.amount;
-  });
-  return months.map(m => m.total);
-}
-
-function buildSparkline(values, color) {
-  const w = 72, h = 28, pad = 3;
-  const max = Math.max(...values, 0.01);
-  const min = Math.min(...values, 0);
-  const range = (max - min) || 1;
-  const n = values.length;
-  const pts = values.map((v, i) => {
-    const x = n < 2 ? w / 2 : (i / (n - 1)) * w;
-    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const lastX = n < 2 ? w / 2 : w;
-  const lastY = (pad + (1 - (values[n-1] - min) / range) * (h - pad * 2)).toFixed(1);
-  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:block;flex-shrink:0"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${lastX}" cy="${lastY}" r="2.5" fill="${color}"/></svg>`;
-}
-
-function trendBadge(curr, prev, lowerIsBetter) {
-  if (prev === 0 && curr === 0) return '';
-  if (prev === 0) return `<span class="dash-trend dash-trend-pos">New this month</span>`;
-  const pct = Math.round(((curr - prev) / Math.abs(prev)) * 100);
-  const positive = lowerIsBetter ? pct <= 0 : pct >= 0;
-  const arrow = pct >= 0 ? '↑' : '↓';
-  return `<span class="dash-trend ${positive ? 'dash-trend-pos' : 'dash-trend-neg'}">${arrow} ${Math.abs(pct)}% vs last month</span>`;
 }
 
 // ══════════════════════════════════════════════════
@@ -746,9 +662,6 @@ function renderDashboard() {
 // ══════════════════════════════════════════════════
 //  ONE-OFF TRANSACTIONS
 // ══════════════════════════════════════════════════
-const INCOME_CATS  = ['Salary','Freelance','Bonus','Investment','Rental','Gift','Other'];
-const EXPENSE_CATS = ['Housing','Food & Groceries','Transport','Utilities','Healthcare','Entertainment','Clothing','Subscriptions','Eating Out','Personal Care','Education','Other'];
-
 let currentOneoffType   = 'income';
 let currentOneoffFilter = 'all';
 
@@ -837,7 +750,6 @@ function renderOneoffList() {
 // ══════════════════════════════════════════════════
 //  RECURRING
 // ══════════════════════════════════════════════════
-const REC_MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let currentRecType   = 'income';
 let editingRecurringId = null;
 
@@ -1562,8 +1474,6 @@ function calcInterestComparison() {
 // ══════════════════════════════════════════════════
 //  CARD TRANSACTIONS (charges + payments)
 // ══════════════════════════════════════════════════
-const CC_TXN_CATS = ['Shopping','Food & Groceries','Transport','Entertainment','Utilities','Healthcare','Travel','Clothing','Electronics','Eating Out','Subscriptions','Other'];
-
 let currentCCTFilter    = 'all';
 let currentCCTTypeInput = 'charge';
 let editingCCTId        = null;
@@ -2130,6 +2040,46 @@ renderOneoffList();
     }
   });
 })();
+
+// ══════════════════════════════════════════════════
+//  WINDOW EXPORTS
+//  ES modules don't pollute window; expose every
+//  function called from inline HTML onclick/onchange.
+// ══════════════════════════════════════════════════
+Object.assign(window, {
+  // Auth / landing
+  signInWithGoogle, signInWithGitHub, submitEmailAuth, setAuthMode,
+  launchApp, showSignInOverlay, signOut,
+  // Account menu & currency
+  toggleAccountMenu, setCurrency,
+  // Navigation & sidebar
+  navigate, toggleSidebar, toggleNavGroup, toggleNavSubgroup, toggleDarkMode,
+  // Migration banner
+  migrateFromLocalStorage, dismissMigration,
+  // One-off transactions
+  addOneoff, setOneoffType, setOneoffFilter, exportOneoffs,
+  // Recurring transactions
+  saveRecurring, cancelRecurringEdit, setRecType, switchRecTab,
+  onRecFrequencyChange, toggleRecMonths, toggleMonthBtn, exportRecurring,
+  editRecurring, deleteRecurring,
+  // Cashflow
+  renderCashflow,
+  // Credit cards
+  saveCard, cancelCardEdit, editCard, deleteCard, toggleCCMinInput,
+  // Calculators
+  switchCalcTab, toggleMinPayInput, calcMinPayment, calcFixedPayment, calcInterestComparison,
+  // 0% Deals
+  saveDeal, cancelDealEdit, editDeal, deleteDeal,
+  // CC Transactions
+  addCCTransaction, setCCTType, setCCTFilter, exportCCTransactions,
+  editCCTransaction, deleteCCTransaction, saveCCTEdit, cancelCCTEdit,
+  // Loans
+  saveLoan, cancelLoanEdit, editLoan, deleteLoan,
+  // Accounts & Transfers
+  saveAccount, cancelAccountEdit, editAccount, deleteAccount,
+  switchAccountTab, toggleAccInterestInput,
+  saveTransfer, cancelTransferEdit, editTransfer, deleteTransfer,
+});
 
 // Error telemetry
 window.onerror = function(msg, src, line, col, err) {
