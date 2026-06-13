@@ -387,7 +387,10 @@
         <div class="form-actions"><button class="btn btn-primary" onclick="addOneoff()">+ Add Entry</button></div>
       </div>
       <div class="panel">
-        <div class="panel-title">Transaction History <span id="oneoff-summary" style="font-size:0.82rem;font-weight:600;margin-left:8px;"></span></div>
+        <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Transaction History <span id="oneoff-summary" style="font-size:0.82rem;font-weight:600;margin-left:8px;"></span></span>
+          <button class="btn-export" onclick="exportOneoffs()" title="Export to CSV">⬇ Export</button>
+        </div>
         <div class="tabs">
           <div class="tab active" id="oneoff-tab-all"     onclick="setOneoffFilter('all')">All</div>
           <div class="tab"        id="oneoff-tab-income"  onclick="setOneoffFilter('income')">💰 Income</div>
@@ -461,6 +464,9 @@
           <div class="tab" onclick="switchRecTab('upcoming', this)">Upcoming (60 days)</div>
         </div>
         <div class="tab-pane active" id="rec-tab-list">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+            <button class="btn-export" onclick="exportRecurring()" title="Export to CSV">⬇ Export</button>
+          </div>
           <div class="table-wrap">
             <table><thead><tr><th>Type</th><th>Name</th><th>Category</th><th>Amount</th><th>Frequency</th><th>Monthly equiv.</th><th>Start</th><th>End</th><th></th></tr></thead>
             <tbody id="recurring-table-body"><tr><td colspan="9" class="empty-state">No recurring transactions yet</td></tr></tbody></table>
@@ -711,7 +717,10 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Transaction History <span id="cct-summary" style="font-size:0.82rem;font-weight:600;margin-left:8px;"></span></div>
+        <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Transaction History <span id="cct-summary" style="font-size:0.82rem;font-weight:600;margin-left:8px;"></span></span>
+          <button class="btn-export" onclick="exportCCTransactions()" title="Export to CSV">⬇ Export</button>
+        </div>
         <div class="tabs" id="cct-tabs">
           <div class="tab active" onclick="setCCTFilter('all')">All</div>
         </div>
