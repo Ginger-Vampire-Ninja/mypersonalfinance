@@ -4,9 +4,9 @@
 //  Requires: TEST_USER_PASSWORD env var (GitHub secret)
 //  Test user: test@finaura.app (email/password auth in Supabase)
 // ══════════════════════════════════════════════════
-const { test, expect } = require('@playwright/test');
-const { createClient }  = require('@supabase/supabase-js');
-const ws               = require('ws');
+import { test, expect } from '@playwright/test';
+import { createClient }  from '@supabase/supabase-js';
+import ws               from 'ws';
 
 const SUPABASE_URL  = 'https://acqiduorpzwwegzaijdc.supabase.co';
 const SUPABASE_KEY  = 'sb_publishable_BNdn9Z-B74oF3XrRZlu-Rw_ePCyaU2f';
