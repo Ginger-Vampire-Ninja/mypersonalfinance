@@ -118,6 +118,21 @@ tr:hover td { background: #fafafa; }
 .cf-oneoff-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 4px; vertical-align: middle; cursor: help; }
 .zero-pct-tag { font-size: 0.65rem; font-weight: 700; color: #0F766E; background: #CCFBF1; border-radius: 4px; padding: 1px 4px; margin-left: 4px; }
 
+/* ── Recurring — active months picker ── */
+.rec-months-section { margin: 14px 0 4px; }
+.rec-months-toggle-label { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none; }
+.rec-months-toggle-label input[type="checkbox"] { width: 15px; height: 15px; accent-color: #0F766E; cursor: pointer; }
+.month-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.month-btn { width: 44px; padding: 5px 0; border: 1.5px solid #e5e7eb; border-radius: 7px; background: #f3f4f6; color: #9ca3af; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.12s; }
+.month-btn.active { background: #0F766E; border-color: #0F766E; color: #fff; }
+.month-btn:not(.active):hover { border-color: #0F766E; color: #0F766E; }
+.rec-months-badge { font-size: 0.7rem; color: #0F766E; background: #CCFBF1; border-radius: 4px; padding: 1px 6px; margin-top: 3px; display: inline-block; font-weight: 600; }
+html[data-theme="dark"] .rec-months-toggle-label { color: #cbd5e1; }
+html[data-theme="dark"] .month-btn { background: #1e293b; border-color: #334155; color: #475569; }
+html[data-theme="dark"] .month-btn.active { background: #0F766E; border-color: #0F766E; color: #fff; }
+html[data-theme="dark"] .month-btn:not(.active):hover { border-color: #2DD4BF; color: #2DD4BF; }
+html[data-theme="dark"] .rec-months-badge { background: rgba(45,212,191,0.15); color: #2DD4BF; }
+
 /* ── Credit card utilisation bar (card list + cashflow tracker) ── */
 .cc-util-bar-wrap { height: 5px; background: #e5e7eb; border-radius: 3px; margin-top: 5px; overflow: hidden; min-width: 70px; }
 .cc-util-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }

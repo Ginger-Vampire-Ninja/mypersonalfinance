@@ -110,7 +110,7 @@ test('recurring transaction syncs to DB', async ({ page }) => {
   await page.fill('#rec-name', 'E2E Salary');
   await page.fill('#rec-amount', '2500');
   // Start date is pre-filled; leave frequency as Monthly
-  await page.click('button[onclick="addRecurring()"]');
+  await page.click('#rec-save-btn');
 
   await page.waitForTimeout(2000); // allow async dbUpsert to complete
 

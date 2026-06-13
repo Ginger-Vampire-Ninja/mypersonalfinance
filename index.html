@@ -404,7 +404,7 @@
     <section class="page" id="page-recurring">
       <div class="page-header"><h1>Recurring Transactions</h1><p>Set up income and expenses that repeat automatically</p></div>
       <div class="panel">
-        <div class="panel-title">Add Recurring Transaction</div>
+        <div class="panel-title" id="rec-form-title">Add Recurring Transaction</div>
         <div class="type-toggle">
           <button class="toggle-btn income active" id="rec-toggle-income"  onclick="setRecType('income')">💰 Income</button>
           <button class="toggle-btn expense"       id="rec-toggle-expense" onclick="setRecType('expense')">💸 Expense</button>
@@ -421,12 +421,39 @@
           </div>
           <div class="form-group"><label>Amount (£)</label><input type="number" id="rec-amount" placeholder="0.00" min="0" step="0.01"/></div>
           <div class="form-group"><label>Frequency</label>
-            <select id="rec-frequency"><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Annually</option></select>
+            <select id="rec-frequency" onchange="onRecFrequencyChange()"><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Annually</option></select>
           </div>
           <div class="form-group"><label>Start Date</label><input type="date" id="rec-start"/></div>
           <div class="form-group"><label>End Date (optional)</label><input type="date" id="rec-end"/></div>
         </div>
-        <div class="form-actions"><button class="btn btn-primary" onclick="addRecurring()">+ Add Recurring</button></div>
+        <div class="rec-months-section" id="rec-months-section">
+          <label class="rec-months-toggle-label">
+            <input type="checkbox" id="rec-months-toggle" onchange="toggleRecMonths()"/>
+            Irregular monthly occurrence <span class="hint" style="display:inline">— e.g. school-term costs</span>
+          </label>
+          <div id="rec-months-picker" style="display:none">
+            <div class="month-picker">
+              <button type="button" class="month-btn active" data-m="0"  onclick="toggleMonthBtn(this)">Jan</button>
+              <button type="button" class="month-btn active" data-m="1"  onclick="toggleMonthBtn(this)">Feb</button>
+              <button type="button" class="month-btn active" data-m="2"  onclick="toggleMonthBtn(this)">Mar</button>
+              <button type="button" class="month-btn active" data-m="3"  onclick="toggleMonthBtn(this)">Apr</button>
+              <button type="button" class="month-btn active" data-m="4"  onclick="toggleMonthBtn(this)">May</button>
+              <button type="button" class="month-btn active" data-m="5"  onclick="toggleMonthBtn(this)">Jun</button>
+              <button type="button" class="month-btn active" data-m="6"  onclick="toggleMonthBtn(this)">Jul</button>
+              <button type="button" class="month-btn active" data-m="7"  onclick="toggleMonthBtn(this)">Aug</button>
+              <button type="button" class="month-btn active" data-m="8"  onclick="toggleMonthBtn(this)">Sep</button>
+              <button type="button" class="month-btn active" data-m="9"  onclick="toggleMonthBtn(this)">Oct</button>
+              <button type="button" class="month-btn active" data-m="10" onclick="toggleMonthBtn(this)">Nov</button>
+              <button type="button" class="month-btn active" data-m="11" onclick="toggleMonthBtn(this)">Dec</button>
+            </div>
+            <div class="hint" style="margin-top:6px">Click to toggle months — shaded = active, unshaded = skipped</div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" id="rec-save-btn" onclick="saveRecurring()">+ Add Recurring</button>
+          <button class="btn-sm-ghost" id="rec-cancel-btn" onclick="cancelRecurringEdit()" style="display:none">Cancel</button>
+          <input type="hidden" id="rec-edit-id" value=""/>
+        </div>
       </div>
       <div class="panel">
         <div class="tabs">
